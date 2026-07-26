@@ -1,0 +1,5 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Compose provides the actual theme (ErdStreamTheme); this is a minimal
+         placeholder so the manifest has a valid android:theme reference. -->
+    <style name="Theme.ErdStream" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

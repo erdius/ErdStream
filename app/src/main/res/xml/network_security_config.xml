@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The server address is user-provided at runtime (a self-hosted
+         Navidrome instance), so it can't be pinned to specific hosts here.
+         Many self-hosted setups are plain HTTP on a local network with no
+         reverse-proxy TLS termination, so cleartext must be allowed. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
