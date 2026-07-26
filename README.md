@@ -19,13 +19,17 @@ No themes, no album art, no clutter — just a plain grayscale UI that connects 
 - Android 9.0 (API 28) or higher
 - A reachable Subsonic API server (e.g. [Navidrome](https://www.navidrome.org/))
 
+## Installing
+
+Prebuilt, signed APKs are attached to each [release](https://github.com/erdius/ErdStream/releases). Android will still warn about installing from an unknown source since it's not distributed via Google Play — you'll need to allow it for your browser or file manager.
+
 ## Building
 
 ```sh
 ./gradlew assembleDebug
 ```
 
-The debug APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
+The debug APK will be at `app/build/outputs/apk/debug/app-debug.apk`. Building a signed release APK (`./gradlew assembleRelease`) requires a `keystore.properties` file (see `app/build.gradle.kts`) pointing at your own signing key — this isn't included in the repo.
 
 ## Connecting
 
