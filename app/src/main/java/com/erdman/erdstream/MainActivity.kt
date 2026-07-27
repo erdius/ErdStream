@@ -209,12 +209,14 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
     var libraryRefreshTrigger by remember { mutableStateOf(0) }
 
     var artists by remember { mutableStateOf<List<ArtistUiModel>>(emptyList()) }
-    var isLoadingArtists by remember { mutableStateOf(true) }
+    var isLoadingArtists by remember { mutableStateOf(false) }
     var artistsError by remember { mutableStateOf<String?>(null) }
+    var hasLoadedArtists by remember { mutableStateOf(false) }
 
     var playlists by remember { mutableStateOf<List<PlaylistUiModel>>(emptyList()) }
-    var isLoadingPlaylists by remember { mutableStateOf(true) }
+    var isLoadingPlaylists by remember { mutableStateOf(false) }
     var playlistsError by remember { mutableStateOf<String?>(null) }
+    var hasLoadedPlaylists by remember { mutableStateOf(false) }
 
     var recentlyAddedAlbums by remember { mutableStateOf<List<AlbumUiModel>>(emptyList()) }
     var recentlyPlayedAlbums by remember { mutableStateOf<List<AlbumUiModel>>(emptyList()) }
@@ -266,11 +268,12 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
         mediaController?.let { viewModel.startPlaybackMonitoring(it) }
     }
 
-    LaunchedEffect(libraryRefreshTrigger) {
+    suspend fun loadArtists() {
         isLoadingArtists = true
         artistsError = null
         try {
             artists = app.subsonicRepository.getArtists()
+            hasLoadedArtists = true
         } catch (e: Exception) {
             artistsError = errorText(e)
         } finally {
@@ -278,16 +281,33 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
         }
     }
 
-    LaunchedEffect(libraryRefreshTrigger) {
+    suspend fun loadPlaylists() {
         isLoadingPlaylists = true
         playlistsError = null
         try {
             playlists = app.subsonicRepository.getPlaylists()
+            hasLoadedPlaylists = true
         } catch (e: Exception) {
             playlistsError = errorText(e)
         } finally {
             isLoadingPlaylists = false
         }
+    }
+
+    // Artists/Playlists used to fetch eagerly at launch alongside Home,
+    // meaning 5 requests competed for bandwidth right when only Home's 3
+    // were actually needed for the screen the user lands on. Load each lazily
+    // the first time its tab is actually visited instead.
+    LaunchedEffect(currentDestination?.route) {
+        if (currentDestination?.route == Screen.Artists.route && !hasLoadedArtists) loadArtists()
+        if (currentDestination?.route == Screen.Playlists.route && !hasLoadedPlaylists) loadPlaylists()
+    }
+
+    // Settings > Resync library refreshes whatever's already been loaded.
+    LaunchedEffect(libraryRefreshTrigger) {
+        if (libraryRefreshTrigger == 0) return@LaunchedEffect
+        if (hasLoadedArtists) loadArtists()
+        if (hasLoadedPlaylists) loadPlaylists()
     }
 
     LaunchedEffect(libraryRefreshTrigger) {
