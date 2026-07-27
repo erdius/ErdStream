@@ -4,6 +4,13 @@ A minimal Subsonic/Navidrome-compatible music streaming client for Android, buil
 
 No themes, no album art, no clutter — just a plain grayscale UI that connects to your own Navidrome (or any Subsonic API) server and streams your library.
 
+<p align="center">
+  <img src="docs/screenshots/home.png" width="200" alt="Home tab" />
+  <img src="docs/screenshots/artists.png" width="200" alt="Artists tab" />
+  <img src="docs/screenshots/playlists.png" width="200" alt="Playlists tab" />
+  <img src="docs/screenshots/search.png" width="200" alt="Search tab" />
+</p>
+
 ## Features
 
 - Connects to any Subsonic API server (Navidrome, etc.)
