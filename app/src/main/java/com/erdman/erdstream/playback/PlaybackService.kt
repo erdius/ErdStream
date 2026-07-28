@@ -9,6 +9,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -40,19 +41,33 @@ class PlaybackService : MediaSessionService() {
         createNotificationChannel()
 
         val loadControl = DefaultLoadControl.Builder()
-            // Buffer more before starting/resuming playback than the default
-            // (was 500ms/1000ms) to smooth out stutter on marginal network
-            // throughput, especially with server-side transcoding involved.
-            .setBufferDurationsMs(15_000, 60_000, 2_500, 5_000)
+            // Buffer much further ahead than ExoPlayer's own defaults (which
+            // are 50s/50s/2.5s/5s) to smooth out stutter on cellular, where
+            // throughput can dip well below what server-side transcoding
+            // needs for a moment. Audio is cheap to buffer, so there's little
+            // downside to buffering minutes ahead on a good connection, and
+            // it means more headroom to coast through a bad patch. The
+            // post-rebuffer threshold in particular was too low before (5s)
+            // and could cause a stutter-loop: resume, stall again, resume,
+            // stall again.
+            .setBufferDurationsMs(60_000, 180_000, 2_500, 15_000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         val app = application as ErdStreamApplication
 
+        // Longer HTTP timeouts than ExoPlayer's default (8s/8s), which can be
+        // tight on degraded cellular combined with server-side transcoding
+        // startup latency.
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setConnectTimeoutMs(20_000)
+            .setReadTimeoutMs(20_000)
+            .setAllowCrossProtocolRedirects(true)
+
         // Cache streamed audio to disk under a stable "songId:bitrate" key
         // (not the request URL, which re-signs its auth token every play) so
         // repeat plays and seeks don't re-fetch over the network.
-        val upstreamFactory = DefaultDataSource.Factory(this)
+        val upstreamFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
         val resolvingFactory = ResolvingDataSource.Factory(upstreamFactory) { dataSpec ->
             val songId = dataSpec.uri.getQueryParameter("id")
             val maxBitRate = dataSpec.uri.getQueryParameter("maxBitRate") ?: "original"
