@@ -4,11 +4,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -21,6 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +48,9 @@ fun SearchScreen(
     onSongClick: (SongUiModel) -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val isScrollable by remember { derivedStateOf { listState.canScrollForward || listState.canScrollBackward } }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         OutlinedTextField(
@@ -70,7 +79,16 @@ fun SearchScreen(
         } else if (errorMessage != null) {
             CenteredMessage { Text(text = errorMessage, color = MaterialTheme.colorScheme.error) }
         } else if (results != null) {
-            LazyColumn(contentPadding = PaddingValues(top = 16.dp)) {
+            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(top = 16.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .eInkVerticalScroll(listState, scope, isScrollable),
+                userScrollEnabled = false,
+            ) {
                 if (results.artists.isNotEmpty()) {
                     item { SectionHeader("Artists") }
                     items(results.artists) { artist ->
@@ -122,6 +140,10 @@ fun SearchScreen(
                         )
                     }
                 }
+            }
+            if (isScrollable) {
+                EInkScrollbar(state = listState, scope = scope)
+            }
             }
         }
     }

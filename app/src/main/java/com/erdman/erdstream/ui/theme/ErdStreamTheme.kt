@@ -1,12 +1,19 @@
 package com.erdman.erdstream.ui.theme
 
+import androidx.compose.foundation.Indication
+import androidx.compose.foundation.IndicationInstance
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 
@@ -51,12 +58,33 @@ private val ErdStreamTypography = Typography(
     titleLarge = TextStyle(fontWeight = FontWeight.Bold),
 )
 
+// Standard Material ripple is an animated pulse -- visible motion that
+// ghosts on e-ink. This is a no-op Indication (draws nothing on press/hover/
+// focus) provided app-wide below, so every clickable/Button/IconButton gets
+// instant tap feedback (the content's own state, e.g. background/border
+// changes a caller sets explicitly) instead of a ripple animation.
+private object NoRippleIndicationInstance : IndicationInstance {
+    override fun ContentDrawScope.drawIndication() {
+        drawContent()
+    }
+}
+
+private object NoRippleIndication : Indication {
+    @Composable
+    override fun rememberUpdatedInstance(interactionSource: InteractionSource): IndicationInstance {
+        return remember { NoRippleIndicationInstance }
+    }
+}
+
 @Composable
 fun ErdStreamTheme(content: @Composable () -> Unit) {
     val colors = if (isSystemInDarkTheme()) DarkColors else LightColors
     MaterialTheme(
         colorScheme = colors,
         typography = ErdStreamTypography,
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalIndication provides NoRippleIndication) {
+            content()
+        }
+    }
 }
