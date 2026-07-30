@@ -44,6 +44,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -502,6 +504,11 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier.padding(paddingValues),
+            // No animated slide/fade between screens -- avoids visible motion on e-ink.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
         ) {
             composable(Screen.Home.route) {
                 HomeScreen(
