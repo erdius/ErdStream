@@ -6,6 +6,7 @@ import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import com.erdman.erdstream.data.CredentialsManager
+import com.erdman.erdstream.data.DuraSpeedSettingsManager
 import com.erdman.erdstream.data.SubsonicRepository
 import com.erdman.erdstream.data.TabSettingsManager
 import com.erdman.erdstream.data.TranscodeSettingsManager
@@ -21,6 +22,7 @@ class ErdStreamApplication : Application() {
     val credentialsManager: CredentialsManager by lazy { CredentialsManager(this) }
     val transcodeSettingsManager: TranscodeSettingsManager by lazy { TranscodeSettingsManager(this) }
     val tabSettingsManager: TabSettingsManager by lazy { TabSettingsManager(this) }
+    val duraspeedSettingsManager: DuraSpeedSettingsManager by lazy { DuraSpeedSettingsManager(this) }
     val subsonicRepository: SubsonicRepository by lazy { SubsonicRepository(credentialsManager) }
 
     /**

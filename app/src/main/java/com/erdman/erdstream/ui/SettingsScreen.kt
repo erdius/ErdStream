@@ -50,6 +50,10 @@ fun SettingsScreen(
     onDisconnectClick: () -> Unit,
     hasBatteryOptimizationExemption: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
+    isDuraSpeedAvailable: Boolean,
+    duraspeedConfirmed: Boolean,
+    onDuraSpeedConfirmedChange: (Boolean) -> Unit,
+    onOpenDuraSpeed: () -> Unit,
     isResyncing: Boolean,
     onResyncLibraryClick: () -> Unit,
     tabSettings: List<TabSetting>,
@@ -207,6 +211,19 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        if (isDuraSpeedAvailable) {
+            item {
+                DuraSpeedStatusRow(
+                    confirmed = duraspeedConfirmed,
+                    onConfirmedChange = onDuraSpeedConfirmedChange,
+                    onOpenDuraSpeed = onOpenDuraSpeed,
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
         item {
             Text(text = "Streaming quality", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(4.dp))
@@ -251,5 +268,43 @@ fun SettingsScreen(
     if (isScrollable) {
         EInkScrollbar(state = listState, scope = scope)
     }
+    }
+}
+
+/**
+ * DuraSpeed's per-app whitelist state can't be queried from a third-party
+ * app, so this is self-reported: tapping the row opens the DuraSpeed app
+ * so the user can check/set it there, and the switch is a manual
+ * "I've done this" toggle that's persisted.
+ */
+@Composable
+private fun DuraSpeedStatusRow(
+    confirmed: Boolean,
+    onConfirmedChange: (Boolean) -> Unit,
+    onOpenDuraSpeed: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenDuraSpeed() }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "DuraSpeed", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = if (confirmed) {
+                    "Confirmed whitelisted (tap to open DuraSpeed)"
+                } else {
+                    "Ensure ErdStream is toggled ON in DuraSpeed settings, then mark it done here"
+                },
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = confirmed,
+            onCheckedChange = onConfirmedChange,
+        )
     }
 }
