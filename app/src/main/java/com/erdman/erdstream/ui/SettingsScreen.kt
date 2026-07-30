@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.erdman.erdstream.BuildConfig
@@ -63,9 +64,9 @@ fun SettingsScreen(
     tabSettings: List<TabSetting>,
     onTabSettingsChange: (List<TabSetting>) -> Unit,
 ) {
-    // 0 = Connection, 1 = Tabs, 2 = Playback, 3 = About
+    // 0 = Server, 1 = Tabs, 2 = Playback, 3 = About
     var selectedTab by remember { mutableStateOf(0) }
-    val tabOptions = listOf("Connection", "Tabs", "Playback", "About")
+    val tabOptions = listOf("Server", "Tabs", "Playback", "About")
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTab) {
@@ -76,8 +77,10 @@ fun SettingsScreen(
                     text = {
                         Text(
                             text = title,
-                            fontSize = 16.sp,
+                            fontSize = 13.sp,
                             fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     },
                 )
