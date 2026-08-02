@@ -28,6 +28,13 @@ interface SubsonicApi {
     @GET("getPlaylist.view")
     suspend fun getPlaylist(@Query("id") id: String): SubsonicEnvelope
 
+    /** [songIndexToRemove] is the song's 0-based position within the playlist, not its song ID. */
+    @GET("updatePlaylist.view")
+    suspend fun updatePlaylist(
+        @Query("playlistId") playlistId: String,
+        @Query("songIndexToRemove") songIndexToRemove: Int,
+    ): SubsonicEnvelope
+
     @GET("search3.view")
     suspend fun search3(
         @Query("query") query: String,

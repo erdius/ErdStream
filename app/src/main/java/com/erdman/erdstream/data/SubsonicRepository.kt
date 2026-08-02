@@ -150,6 +150,12 @@ class SubsonicRepository(
         )
     }
 
+    /** [songIndex] is the song's 0-based position within the playlist, not its song ID. */
+    suspend fun removeSongFromPlaylist(playlistId: String, songIndex: Int) = withContext(Dispatchers.IO) {
+        api().updatePlaylist(playlistId, songIndex).response.requireOk()
+        Unit
+    }
+
     suspend fun search(query: String): SearchResults = withContext(Dispatchers.IO) {
         val response = api().search3(query).response.requireOk()
         val result = response.searchResult3

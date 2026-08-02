@@ -15,11 +15,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -97,6 +99,7 @@ fun SongRow(
     isCurrentlyPlaying: Boolean,
     showTrackNumber: Boolean,
     onClick: () -> Unit,
+    onRemoveClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -133,6 +136,12 @@ fun SongRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        }
+
+        if (onRemoveClick != null) {
+            IconButton(onClick = onRemoveClick) {
+                Icon(imageVector = Icons.Outlined.Delete, contentDescription = "Remove from playlist")
             }
         }
     }

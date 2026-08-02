@@ -34,6 +34,7 @@ fun PlaylistDetailsScreen(
     errorMessage: String?,
     onPlaySongClick: (SongUiModel) -> Unit,
     onShuffleClick: () -> Unit,
+    onRemoveSongClick: (index: Int) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -55,12 +56,14 @@ fun PlaylistDetailsScreen(
                             .eInkVerticalScroll(listState, scope, isScrollable),
                         userScrollEnabled = false,
                     ) {
-                        items(items = songs, key = { it.id }) { song ->
+                        items(count = songs.size) { index ->
+                            val song = songs[index]
                             SongRow(
                                 song = song,
                                 isCurrentlyPlaying = song.id == currentSongId,
                                 showTrackNumber = false,
                                 onClick = { onPlaySongClick(song) },
+                                onRemoveClick = { onRemoveSongClick(index) },
                             )
                             HorizontalDivider()
                         }

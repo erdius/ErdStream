@@ -370,8 +370,7 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
         }
     }
 
-    LaunchedEffect(selectedPlaylistId) {
-        val playlistId = selectedPlaylistId ?: return@LaunchedEffect
+    suspend fun loadPlaylistDetail(playlistId: String) {
         isLoadingPlaylist = true
         playlistError = null
         try {
@@ -381,6 +380,11 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
         } finally {
             isLoadingPlaylist = false
         }
+    }
+
+    LaunchedEffect(selectedPlaylistId) {
+        val playlistId = selectedPlaylistId ?: return@LaunchedEffect
+        loadPlaylistDetail(playlistId)
     }
 
     fun performSearch() {
@@ -619,6 +623,26 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                         if (songs.isNotEmpty()) {
                             viewModel.startShuffledPlaybackFromQueue(songs, mediaController)
                             showNowPlaying = true
+                        }
+                    },
+                    onRemoveSongClick = { index ->
+                        val playlistId = selectedPlaylistId
+                        val currentDetail = playlistDetail
+                        if (playlistId != null && currentDetail != null && index in currentDetail.songs.indices) {
+                            // Optimistic removal so the row disappears immediately;
+                            // reload from the server only if the request fails, to
+                            // roll back and re-sync.
+                            playlistDetail = currentDetail.copy(
+                                songs = currentDetail.songs.toMutableList().apply { removeAt(index) },
+                            )
+                            scope.launch {
+                                try {
+                                    app.subsonicRepository.removeSongFromPlaylist(playlistId, index)
+                                } catch (e: Exception) {
+                                    playlistError = errorText(e)
+                                    loadPlaylistDetail(playlistId)
+                                }
+                            }
                         }
                     },
                 )
