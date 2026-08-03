@@ -44,6 +44,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -264,11 +265,18 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
     fun errorText(e: Throwable): String =
         (e as? SubsonicException)?.message ?: e.message ?: "Something went wrong"
 
-    // Connect to the playback service.
-    LaunchedEffect(Unit) {
+    // Connect to the playback service. Released explicitly on dispose rather
+    // than left to Android's implicit unbind-on-destroy: letting the system
+    // unbind it implicitly while Media3's own disconnect-triggered internal
+    // release can also fire independently raced two release paths against
+    // each other, crashing with "Service not registered" from a redundant
+    // unbindService call.
+    DisposableEffect(Unit) {
+        var controllerFuture: ListenableFuture<MediaController>? = null
         try {
             val sessionToken = SessionToken(context, ComponentName(context, PlaybackService::class.java))
             val future = MediaController.Builder(context, sessionToken).buildAsync()
+            controllerFuture = future
             future.addListener({
                 try {
                     mediaController = future.get()
@@ -276,6 +284,11 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                 }
             }, ContextCompat.getMainExecutor(context))
         } catch (_: Exception) {
+        }
+
+        onDispose {
+            controllerFuture?.let { MediaController.releaseFuture(it) }
+            mediaController = null
         }
     }
 
