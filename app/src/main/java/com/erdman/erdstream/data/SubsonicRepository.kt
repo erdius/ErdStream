@@ -156,6 +156,11 @@ class SubsonicRepository(
         Unit
     }
 
+    suspend fun deletePlaylist(playlistId: String) = withContext(Dispatchers.IO) {
+        api().deletePlaylist(playlistId).response.requireOk()
+        Unit
+    }
+
     suspend fun search(query: String): SearchResults = withContext(Dispatchers.IO) {
         val response = api().search3(query).response.requireOk()
         val result = response.searchResult3

@@ -1,6 +1,7 @@
 package com.erdman.erdstream.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,13 +16,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -93,18 +92,19 @@ fun AlbumDetailsScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRow(
     song: SongUiModel,
     isCurrentlyPlaying: Boolean,
     showTrackNumber: Boolean,
     onClick: () -> Unit,
-    onRemoveClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -136,12 +136,6 @@ fun SongRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-        }
-
-        if (onRemoveClick != null) {
-            IconButton(onClick = onRemoveClick) {
-                Icon(imageVector = Icons.Outlined.Delete, contentDescription = "Remove from playlist")
             }
         }
     }

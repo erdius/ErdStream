@@ -35,6 +35,9 @@ interface SubsonicApi {
         @Query("songIndexToRemove") songIndexToRemove: Int,
     ): SubsonicEnvelope
 
+    @GET("deletePlaylist.view")
+    suspend fun deletePlaylist(@Query("id") id: String): SubsonicEnvelope
+
     @GET("search3.view")
     suspend fun search3(
         @Query("query") query: String,

@@ -619,6 +619,19 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                         selectedPlaylistId = playlist.id
                         navController.navigate(Screen.PlaylistDetails.route) { launchSingleTop = true }
                     },
+                    onDeletePlaylistClick = { playlist ->
+                        // Optimistic removal from the list; reload only on
+                        // failure, to roll back and re-sync.
+                        playlists = playlists.filterNot { it.id == playlist.id }
+                        scope.launch {
+                            try {
+                                app.subsonicRepository.deletePlaylist(playlist.id)
+                            } catch (e: Exception) {
+                                playlistsError = errorText(e)
+                                loadPlaylists()
+                            }
+                        }
+                    },
                 )
             }
             composable(Screen.PlaylistDetails.route) {
