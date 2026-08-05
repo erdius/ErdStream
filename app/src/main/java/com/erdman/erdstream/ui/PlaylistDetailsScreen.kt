@@ -36,7 +36,6 @@ import com.mudita.mmd.components.bottom_sheet.rememberModalBottomSheetMMDState
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.buttons.FloatingActionButtonMMD
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
-import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.text.TextMMD
 
@@ -70,7 +69,7 @@ fun PlaylistDetailsScreen(
                             onClick = { onPlaySongClick(song) },
                             onLongClick = { pendingRemoveIndex = index },
                         )
-                        HorizontalDividerMMD()
+                        DashedDivider()
                     }
                 }
 

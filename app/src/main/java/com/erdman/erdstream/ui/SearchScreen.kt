@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 
 @Composable
@@ -100,7 +99,7 @@ fun SearchScreen(
                         ) {
                             Text(text = artist.name, fontSize = 16.sp)
                         }
-                        HorizontalDividerMMD()
+                        DashedDivider()
                     }
                 }
 
@@ -115,7 +114,7 @@ fun SearchScreen(
                         ) {
                             Text(text = "${album.name} — ${album.artist ?: ""}", fontSize = 16.sp)
                         }
-                        HorizontalDividerMMD()
+                        DashedDivider()
                     }
                 }
 
@@ -128,7 +127,7 @@ fun SearchScreen(
                             showTrackNumber = false,
                             onClick = { onSongClick(song) },
                         )
-                        HorizontalDividerMMD()
+                        DashedDivider()
                     }
                 }
 

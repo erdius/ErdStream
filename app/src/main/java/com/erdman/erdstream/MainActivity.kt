@@ -19,11 +19,13 @@ import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.text.font.FontWeight
+import com.mudita.mmd.components.nav_bar.NavigationBarItemMMD
+import com.mudita.mmd.components.nav_bar.NavigationBarMMD
+import com.mudita.mmd.components.text.TextMMD
+import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -484,7 +486,7 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            TopAppBarMMD(
                 title = { Text(text = screenTitle(currentDestination?.route, selectedArtist?.name)) },
                 navigationIcon = {
                     if (canNavigateBack && currentDestination?.route !in navItems.map { it.route }) {
@@ -510,10 +512,10 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
         },
         bottomBar = {
             if (currentDestination?.route in visibleNavItems.map { it.route }) {
-                NavigationBar {
+                NavigationBarMMD {
                     visibleNavItems.forEach { screen ->
                         val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                        NavigationBarItem(
+                        NavigationBarItemMMD(
                             selected = selected,
                             onClick = {
                                 navController.navigate(screen.route) {
@@ -523,7 +525,12 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                                 }
                             },
                             icon = { screen.icon?.let { Icon(it, contentDescription = screen.label) } },
-                            label = { Text(screen.label) },
+                            label = {
+                                TextMMD(
+                                    text = screen.label,
+                                    fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                                )
+                            },
                         )
                     }
                 }

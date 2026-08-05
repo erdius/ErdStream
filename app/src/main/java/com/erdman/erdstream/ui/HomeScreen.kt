@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
-import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 
 @Composable
@@ -214,5 +213,5 @@ fun AlbumRow(album: AlbumUiModel, onClick: () -> Unit) {
             }
         }
     }
-    HorizontalDividerMMD()
+    DashedDivider()
 }

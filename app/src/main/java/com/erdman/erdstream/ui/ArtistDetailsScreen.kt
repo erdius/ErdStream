@@ -16,7 +16,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
-import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
 
 @Composable
@@ -52,7 +51,7 @@ fun ArtistDetailsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        HorizontalDividerMMD()
+                        DashedDivider()
                     }
                 }
             }
