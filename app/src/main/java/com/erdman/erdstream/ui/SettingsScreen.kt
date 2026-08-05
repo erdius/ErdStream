@@ -5,15 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
@@ -23,11 +20,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +37,7 @@ import com.erdman.erdstream.data.TranscodeBitrate
 import com.erdman.erdstream.navItems
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
+import com.mudita.mmd.components.lazy.LazyColumnMMD
 import com.mudita.mmd.components.radio_button.RadioButtonMMD
 import com.mudita.mmd.components.switcher.SwitchMMD
 import com.mudita.mmd.components.tabs.PrimaryTabRowMMD
@@ -293,30 +289,11 @@ fun SettingsScreen(
 }
 
 /**
- * Shared scaffolding for a settings tab's content: a jump-scrolling
- * LazyColumn with an e-ink scrollbar, matching the scroll behavior used
- * throughout the rest of the app.
+ * Shared scaffolding for a settings tab's content.
  */
 @Composable
 private fun SettingsTabColumn(content: LazyListScope.() -> Unit) {
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val isScrollable by remember { derivedStateOf { listState.canScrollForward || listState.canScrollBackward } }
-
-    Row(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .eInkVerticalScroll(listState, scope, isScrollable),
-            contentPadding = PaddingValues(16.dp),
-            userScrollEnabled = false,
-            content = content,
-        )
-        // Always reserve the scrollbar's width -- see HomeScreen.kt for why.
-        EInkScrollbar(state = listState, scope = scope)
-    }
+    LazyColumnMMD(contentPadding = PaddingValues(16.dp), content = content)
 }
 
 /**
