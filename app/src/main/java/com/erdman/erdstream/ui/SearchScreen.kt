@@ -42,11 +42,16 @@ fun SearchScreen(
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    // fillMaxSize() with no padding at the root, same as every other
+    // screen -- padding lives on individual elements/contentPadding below
+    // instead. A padded root leaves a permanent unpainted border in every
+    // state this screen can be in, which is exactly the kind of gap that
+    // lets the previous tab's content keep showing through on e-ink.
+    Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             placeholder = { Text("Search artists, albums, songs") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -67,7 +72,13 @@ fun SearchScreen(
         if (isSearching) {
             CenteredMessage { CircularProgressIndicatorMMD() }
         } else if (errorMessage != null) {
-            CenteredMessage { Text(text = errorMessage, color = MaterialTheme.colorScheme.error) }
+            CenteredMessage {
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
         } else if (results == null) {
             // Every other branch here (and every other tab) always paints
             // its full content area -- this placeholder does the same so
@@ -77,12 +88,13 @@ fun SearchScreen(
                 Text(
                     text = "Search your library",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
         } else {
             LazyColumnMMD(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(top = 16.dp),
+                contentPadding = PaddingValues(16.dp),
             ) {
                 if (results.artists.isNotEmpty()) {
                     item { SectionHeader("Artists") }
