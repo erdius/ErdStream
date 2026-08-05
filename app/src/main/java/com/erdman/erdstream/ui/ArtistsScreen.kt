@@ -60,9 +60,9 @@ fun ArtistsScreen(
 }
 
 @Composable
-fun CenteredMessage(content: @Composable () -> Unit) {
+fun CenteredMessage(modifier: Modifier = Modifier.fillMaxSize(), content: @Composable () -> Unit) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         content()

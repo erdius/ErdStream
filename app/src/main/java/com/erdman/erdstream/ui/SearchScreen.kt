@@ -70,9 +70,18 @@ fun SearchScreen(
         )
 
         if (isSearching) {
-            CenteredMessage { CircularProgressIndicatorMMD() }
+            // CenteredMessage's default modifier is fillMaxSize(), which
+            // only fills correctly when it's the sole content of a Box
+            // (every other tab). Here it's a sibling of the search field
+            // inside a Column, so it needs weight(1f) to claim the actual
+            // remaining space instead of stacking a full-screen-tall box
+            // below the field -- otherwise its content renders far past
+            // the visible area instead of centered in the remaining space,
+            // which is what was leaving the previous tab's content as the
+            // only thing visibly occupying that region.
+            CenteredMessage(modifier = Modifier.weight(1f).fillMaxSize()) { CircularProgressIndicatorMMD() }
         } else if (errorMessage != null) {
-            CenteredMessage {
+            CenteredMessage(modifier = Modifier.weight(1f).fillMaxSize()) {
                 Text(
                     text = errorMessage,
                     color = MaterialTheme.colorScheme.error,
@@ -80,11 +89,7 @@ fun SearchScreen(
                 )
             }
         } else if (results == null) {
-            // Every other branch here (and every other tab) always paints
-            // its full content area -- this placeholder does the same so
-            // there's never a mostly-blank gap left for the previous
-            // screen's content to still show through underneath.
-            CenteredMessage {
+            CenteredMessage(modifier = Modifier.weight(1f).fillMaxSize()) {
                 Text(
                     text = "Search your library",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
