@@ -314,9 +314,8 @@ private fun SettingsTabColumn(content: LazyListScope.() -> Unit) {
             userScrollEnabled = false,
             content = content,
         )
-        if (isScrollable) {
-            EInkScrollbar(state = listState, scope = scope)
-        }
+        // Always reserve the scrollbar's width -- see HomeScreen.kt for why.
+        EInkScrollbar(state = listState, scope = scope)
     }
 }
 

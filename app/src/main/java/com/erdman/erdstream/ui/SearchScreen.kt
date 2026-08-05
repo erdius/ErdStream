@@ -140,9 +140,8 @@ fun SearchScreen(
                     }
                 }
             }
-            if (isScrollable) {
-                EInkScrollbar(state = listState, scope = scope)
-            }
+            // Always reserve the scrollbar's width -- see HomeScreen.kt for why.
+            EInkScrollbar(state = listState, scope = scope)
             }
         }
     }

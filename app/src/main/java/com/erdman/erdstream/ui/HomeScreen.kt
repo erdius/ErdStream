@@ -143,9 +143,12 @@ fun HomeScreen(
                         }
                     }
                 }
-                if (isScrollable) {
-                    EInkScrollbar(state = listState, scope = scope)
-                }
+                // Always reserve the scrollbar's width instead of only
+                // adding it once isScrollable flips true -- otherwise the
+                // LazyColumn's weight(1f) share changes after the first
+                // layout pass, reflowing every row's text at a narrower
+                // width and reading as a delayed/overlapping redraw.
+                EInkScrollbar(state = listState, scope = scope)
                 }
             }
         }
