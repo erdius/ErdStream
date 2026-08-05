@@ -1,6 +1,6 @@
 # ErdStream
 
-A minimal Subsonic/Navidrome-compatible music streaming client for Android, built for e-ink phones like the Mudita Kompakt and Light Phone 3 (I won't have a light phone until September so I can't test yet)
+A minimal Subsonic/Navidrome-compatible music streaming client for Android, built for the Mudita Kompakt using Mudita's own MMD (Mudita Mindful Design) component library for the e-ink UI.
 
 No themes, no album art, no clutter — just a plain grayscale UI that connects to your own Navidrome (or any Subsonic API) server and streams your library.
 

@@ -17,15 +17,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -45,7 +40,15 @@ import com.erdman.erdstream.data.TabSettingsManager
 import com.erdman.erdstream.data.TabSetting
 import com.erdman.erdstream.data.TranscodeBitrate
 import com.erdman.erdstream.navItems
+import com.mudita.mmd.components.divider.HorizontalDividerMMD
+import com.mudita.mmd.components.buttons.OutlinedButtonMMD
+import com.mudita.mmd.components.radio_button.RadioButtonMMD
+import com.mudita.mmd.components.switcher.SwitchMMD
+import com.mudita.mmd.components.tabs.PrimaryTabRowMMD
+import com.mudita.mmd.components.tabs.TabMMD
+import com.mudita.mmd.components.text.TextMMD
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     serverUrl: String,
@@ -69,13 +72,13 @@ fun SettingsScreen(
     val tabOptions = listOf("Server", "Tabs", "Playback", "About")
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = selectedTab) {
+        PrimaryTabRowMMD(selectedTabIndex = selectedTab) {
             tabOptions.forEachIndexed { index, title ->
-                Tab(
+                TabMMD(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
                     text = {
-                        Text(
+                        TextMMD(
                             text = title,
                             fontSize = 13.sp,
                             fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
@@ -97,13 +100,13 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(onClick = onDisconnectClick) {
+                    OutlinedButtonMMD(onClick = onDisconnectClick) {
                         Text("Disconnect")
                     }
                 }
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider()
+                    HorizontalDividerMMD()
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(text = "Library", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -112,7 +115,7 @@ fun SettingsScreen(
                         fontSize = 14.sp,
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
+                    OutlinedButtonMMD(
                         onClick = onResyncLibraryClick,
                         enabled = !isResyncing,
                     ) {
@@ -181,7 +184,7 @@ fun SettingsScreen(
                             Icon(imageVector = Icons.Outlined.KeyboardArrowDown, contentDescription = "Move $label down")
                         }
 
-                        Switch(
+                        SwitchMMD(
                             checked = setting.visible,
                             onCheckedChange = { visible ->
                                 if (!isSettingsTab) {
@@ -214,7 +217,7 @@ fun SettingsScreen(
                         fontSize = 14.sp,
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
+                    OutlinedButtonMMD(
                         onClick = onRequestBatteryOptimizationExemption,
                         enabled = !hasBatteryOptimizationExemption,
                     ) {
@@ -241,7 +244,7 @@ fun SettingsScreen(
 
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider()
+                    HorizontalDividerMMD()
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "Streaming quality",
@@ -264,7 +267,7 @@ fun SettingsScreen(
                             .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(
+                        RadioButtonMMD(
                             selected = option == selectedBitrate,
                             onClick = { onBitrateSelected(option) },
                         )
@@ -348,7 +351,7 @@ private fun DuraSpeedStatusRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(
+        SwitchMMD(
             checked = confirmed,
             onCheckedChange = onConfirmedChange,
         )

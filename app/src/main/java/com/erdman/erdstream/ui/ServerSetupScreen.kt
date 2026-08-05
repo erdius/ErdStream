@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -25,6 +23,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mudita.mmd.components.buttons.ButtonMMD
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import kotlinx.coroutines.launch
 
 @Composable
@@ -102,11 +102,11 @@ fun ServerSetupScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        Button(
+        ButtonMMD(
             onClick = {
                 if (serverUrl.isBlank() || username.isBlank() || password.isBlank()) {
                     errorMessage = "Please fill in all fields."
-                    return@Button
+                    return@ButtonMMD
                 }
                 isConnecting = true
                 errorMessage = null
@@ -124,7 +124,7 @@ fun ServerSetupScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             if (isConnecting) {
-                CircularProgressIndicator(modifier = Modifier.height(20.dp))
+                CircularProgressIndicatorMMD(modifier = Modifier.height(20.dp))
             } else {
                 Text("Connect")
             }

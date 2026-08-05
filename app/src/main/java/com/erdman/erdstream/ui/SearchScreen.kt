@@ -15,8 +15,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mudita.mmd.components.divider.HorizontalDividerMMD
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 
 @Composable
 fun SearchScreen(
@@ -75,7 +75,7 @@ fun SearchScreen(
         )
 
         if (isSearching) {
-            CenteredMessage { CircularProgressIndicator() }
+            CenteredMessage { CircularProgressIndicatorMMD() }
         } else if (errorMessage != null) {
             CenteredMessage { Text(text = errorMessage, color = MaterialTheme.colorScheme.error) }
         } else if (results != null) {
@@ -100,7 +100,7 @@ fun SearchScreen(
                         ) {
                             Text(text = artist.name, fontSize = 16.sp)
                         }
-                        HorizontalDivider()
+                        HorizontalDividerMMD()
                     }
                 }
 
@@ -115,7 +115,7 @@ fun SearchScreen(
                         ) {
                             Text(text = "${album.name} — ${album.artist ?: ""}", fontSize = 16.sp)
                         }
-                        HorizontalDivider()
+                        HorizontalDividerMMD()
                     }
                 }
 
@@ -128,7 +128,7 @@ fun SearchScreen(
                             showTrackNumber = false,
                             onClick = { onSongClick(song) },
                         )
-                        HorizontalDivider()
+                        HorizontalDividerMMD()
                     }
                 }
 

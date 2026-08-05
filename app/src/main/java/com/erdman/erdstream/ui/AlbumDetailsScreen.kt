@@ -11,29 +11,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Shuffle
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
+import com.mudita.mmd.components.buttons.FloatingActionButtonMMD
+import com.mudita.mmd.components.divider.HorizontalDividerMMD
+import com.mudita.mmd.components.lazy.LazyColumnMMD
 
 @Composable
 fun AlbumDetailsScreen(
@@ -44,42 +38,25 @@ fun AlbumDetailsScreen(
     onPlaySongClick: (SongUiModel) -> Unit,
     onShuffleClick: () -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val isScrollable by remember { derivedStateOf { listState.canScrollForward || listState.canScrollBackward } }
-
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            isLoading -> CenteredMessage { CircularProgressIndicator() }
+            isLoading -> CenteredMessage { CircularProgressIndicatorMMD() }
             errorMessage != null -> CenteredMessage { Text(text = errorMessage, color = MaterialTheme.colorScheme.error) }
             songs.isEmpty() -> CenteredMessage { Text(text = "No songs in this album") }
             else -> {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        state = listState,
-                        contentPadding = PaddingValues(16.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .eInkVerticalScroll(listState, scope, isScrollable),
-                        userScrollEnabled = false,
-                    ) {
-                        items(items = songs, key = { it.id }) { song ->
-                            SongRow(
-                                song = song,
-                                isCurrentlyPlaying = song.id == currentSongId,
-                                showTrackNumber = true,
-                                onClick = { onPlaySongClick(song) },
-                            )
-                            HorizontalDivider()
-                        }
-                    }
-                    if (isScrollable) {
-                        EInkScrollbar(state = listState, scope = scope)
+                LazyColumnMMD(contentPadding = PaddingValues(16.dp)) {
+                    items(items = songs, key = { it.id }) { song ->
+                        SongRow(
+                            song = song,
+                            isCurrentlyPlaying = song.id == currentSongId,
+                            showTrackNumber = true,
+                            onClick = { onPlaySongClick(song) },
+                        )
+                        HorizontalDividerMMD()
                     }
                 }
 
-                FloatingActionButton(
+                FloatingActionButtonMMD(
                     onClick = onShuffleClick,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)

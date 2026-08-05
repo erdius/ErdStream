@@ -20,12 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.Shuffle
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -38,6 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mudita.mmd.components.buttons.ButtonMMD
+import com.mudita.mmd.components.buttons.OutlinedButtonMMD
+import com.mudita.mmd.components.divider.HorizontalDividerMMD
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 
 @Composable
 fun HomeScreen(
@@ -61,7 +61,7 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            isLoading -> CenteredMessage { CircularProgressIndicator() }
+            isLoading -> CenteredMessage { CircularProgressIndicatorMMD() }
             errorMessage != null -> CenteredMessage { Text(text = errorMessage, color = MaterialTheme.colorScheme.error) }
             else -> {
                 Row(modifier = Modifier.fillMaxSize()) {
@@ -79,7 +79,7 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Button(
+                            ButtonMMD(
                                 onClick = onAlbumMixClick,
                                 enabled = !isBuildingMix,
                                 modifier = Modifier.weight(1f),
@@ -88,7 +88,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Album Mix")
                             }
-                            Button(
+                            ButtonMMD(
                                 onClick = onTrackMixClick,
                                 enabled = !isBuildingMix,
                                 modifier = Modifier.weight(1f),
@@ -162,7 +162,7 @@ private fun SectionHeader(title: String, onSeeAllClick: (() -> Unit)?) {
     ) {
         Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         if (onSeeAllClick != null) {
-            OutlinedButton(onClick = onSeeAllClick) {
+            OutlinedButtonMMD(onClick = onSeeAllClick) {
                 Text("See all", fontSize = 13.sp)
             }
         }
@@ -214,5 +214,5 @@ fun AlbumRow(album: AlbumUiModel, onClick: () -> Unit) {
             }
         }
     }
-    HorizontalDivider()
+    HorizontalDividerMMD()
 }

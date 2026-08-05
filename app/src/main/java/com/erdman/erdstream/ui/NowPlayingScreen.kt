@@ -23,12 +23,10 @@ import androidx.compose.material.icons.outlined.RepeatOne
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -39,6 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.erdman.erdstream.RepeatMode
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
+import com.mudita.mmd.components.slider.SliderMMD
 
 @Composable
 fun NowPlayingScreen(
@@ -100,7 +100,7 @@ fun NowPlayingScreen(
         }
 
         Column(modifier = Modifier.fillMaxWidth()) {
-            Slider(
+            SliderMMD(
                 value = if (durationMs > 0) currentPositionMs.toFloat() / durationMs else 0f,
                 onValueChange = { value ->
                     if (durationMs > 0) {
@@ -128,7 +128,7 @@ fun NowPlayingScreen(
             }
 
             if (isBuffering) {
-                CircularProgressIndicator(modifier = Modifier.size(56.dp))
+                CircularProgressIndicatorMMD(modifier = Modifier.size(56.dp))
             } else {
                 IconButton(onClick = onPlayPauseClick, modifier = Modifier.size(72.dp)) {
                     Icon(

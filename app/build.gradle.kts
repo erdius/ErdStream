@@ -18,8 +18,8 @@ android {
         applicationId = "com.erdman.erdstream"
         minSdk = 28
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.2.2"
+        versionCode = 14
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -109,6 +109,9 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-database:1.3.1")
+
+    // Mudita Mindful Design Framework
+    implementation("com.mudita:MMD:1.0.0")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.0.4")
 
