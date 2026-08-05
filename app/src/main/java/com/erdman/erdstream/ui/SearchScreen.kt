@@ -68,7 +68,18 @@ fun SearchScreen(
             CenteredMessage { CircularProgressIndicatorMMD() }
         } else if (errorMessage != null) {
             CenteredMessage { Text(text = errorMessage, color = MaterialTheme.colorScheme.error) }
-        } else if (results != null) {
+        } else if (results == null) {
+            // Every other branch here (and every other tab) always paints
+            // its full content area -- this placeholder does the same so
+            // there's never a mostly-blank gap left for the previous
+            // screen's content to still show through underneath.
+            CenteredMessage {
+                Text(
+                    text = "Search your library",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
             LazyColumnMMD(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(top = 16.dp),
