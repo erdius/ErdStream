@@ -62,20 +62,22 @@ fun HomeScreen(
                             ButtonMMD(
                                 onClick = onAlbumMixClick,
                                 enabled = !isBuildingMix,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                             ) {
-                                Icon(imageVector = Icons.Outlined.Album, contentDescription = null, modifier = Modifier.height(20.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Album Mix")
+                                Icon(imageVector = Icons.Outlined.Album, contentDescription = null, modifier = Modifier.height(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Album Mix", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp)
                             }
                             ButtonMMD(
                                 onClick = onTrackMixClick,
                                 enabled = !isBuildingMix,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                             ) {
-                                Icon(imageVector = Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.height(20.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Track Mix")
+                                Icon(imageVector = Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.height(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Track Mix", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp)
                             }
                         }
                         if (isBuildingMix) {
