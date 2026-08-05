@@ -18,8 +18,8 @@ android {
         applicationId = "com.erdman.erdstream"
         minSdk = 28
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.3.6"
+        versionCode = 21
+        versionName = "0.3.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

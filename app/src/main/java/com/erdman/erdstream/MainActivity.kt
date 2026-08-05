@@ -12,6 +12,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
@@ -76,6 +80,7 @@ import com.erdman.erdstream.ui.SongUiModel
 import com.erdman.erdstream.ui.theme.ErdStreamTheme
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -131,6 +136,26 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val scope = rememberCoroutineScope()
+
+    // The e-ink panel does a fast "partial refresh" between screens that
+    // don't share much visual structure -- confirmed on video specifically
+    // for list screen -> Search, which fades the old screen's content
+    // through gray instead of clearing it outright (a hardware/driver
+    // behavior, not a Compose layout bug; other tab pairs share enough
+    // visual structure that the same partial refresh isn't noticeable).
+    // Briefly flashing an opaque overlay over the whole screen forces a
+    // full refresh instead, the same technique this device's own launcher
+    // (inkOS/Katapult, com.github.gezimos.inkos) uses for the same reason.
+    // Scoped to just entering Search rather than every navigation, since
+    // every other tab pair already transitions cleanly without it.
+    var showEinkFlash by remember { mutableStateOf(false) }
+    LaunchedEffect(currentDestination?.route) {
+        if (currentDestination?.route == Screen.Search.route) {
+            showEinkFlash = true
+            delay(80)
+            showEinkFlash = false
+        }
+    }
 
     val viewModel: ErdStreamViewModel = viewModel(factory = ErdStreamViewModel.factory(app))
     val playbackState by viewModel.playbackState.collectAsState()
@@ -775,6 +800,10 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
             onRepeatClick = { viewModel.cycleRepeatMode(mediaController) },
             onBackClick = { showNowPlaying = false },
         )
+    }
+
+    if (showEinkFlash) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
     }
 }
 
