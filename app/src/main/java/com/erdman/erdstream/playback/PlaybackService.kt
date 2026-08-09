@@ -8,10 +8,12 @@ import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -74,12 +76,29 @@ class PlaybackService : MediaSessionService() {
             val stableKey = if (songId != null) "$songId:$maxBitRate" else dataSpec.uri.toString()
             dataSpec.buildUpon().setKey(stableKey).build()
         }
-        val cacheDataSourceFactory = CacheDataSource.Factory()
+        val subsonicDataSourceFactory = CacheDataSource.Factory()
             .setCache(app.mediaCache)
             .setUpstreamDataSourceFactory(resolvingFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
-        val mediaSourceFactory = DefaultMediaSourceFactory(cacheDataSourceFactory)
+        // Internet radio (Icecast/Shoutcast) streams are live and must never
+        // be disk-cached, and need their own connection pinned to HTTP/1.1 --
+        // see the comment on radioDataSourceFactory below for why. Dispatch
+        // by comparing each request's host against the configured Subsonic
+        // server's host, re-read per request in case the user switches
+        // servers without restarting this long-lived service.
+        val radioDataSourceFactory = buildRadioDataSourceFactory()
+        val mediaDataSourceFactory = DispatchingDataSourceFactory(
+            primaryFactory = subsonicDataSourceFactory,
+            secondaryFactory = radioDataSourceFactory,
+            usePrimary = { uri ->
+                val subsonicHost = app.credentialsManager.credentials.value?.serverUrl
+                    ?.let { android.net.Uri.parse(it).host }
+                subsonicHost != null && uri.host == subsonicHost
+            },
+        )
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(mediaDataSourceFactory)
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(mediaSourceFactory)
@@ -92,6 +111,30 @@ class PlaybackService : MediaSessionService() {
             .build()
         player.setAudioAttributes(audioAttributes, true)
         player.setHandleAudioBecomingNoisy(true)
+
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                super.onMediaItemTransition(mediaItem, reason)
+                // A fresh MediaItem means any previous station's live
+                // metadata is stale until new ICY data arrives.
+                app.radioMetadataManager.updateIcyStreamTitle(null)
+            }
+
+            // Icecast/Shoutcast in-band "StreamTitle" metadata arrives as an
+            // IcyInfo entry here. It does NOT get merged into
+            // Player.mediaMetadata / MediaController.mediaMetadata, so it
+            // must be read from this raw callback rather than polled from
+            // the controller.
+            override fun onMetadata(metadata: androidx.media3.common.Metadata) {
+                super.onMetadata(metadata)
+                for (i in 0 until metadata.length()) {
+                    val entry = metadata.get(i)
+                    if (entry is androidx.media3.extractor.metadata.icy.IcyInfo) {
+                        app.radioMetadataManager.updateIcyStreamTitle(entry.title)
+                    }
+                }
+            }
+        })
 
         val sessionActivityIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -114,6 +157,28 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         setMediaNotificationProvider(notificationProvider)
+    }
+
+    /**
+     * Icecast/Shoutcast in-band metadata ("StreamTitle") is interleaved into
+     * the raw HTTP/1.1 response body at a fixed byte interval (icy-metaint).
+     * That convention doesn't survive HTTP/2 framing, and Android's
+     * HttpURLConnection (what DefaultHttpDataSource wraps) will silently
+     * negotiate HTTP/2 with any server that offers it via ALPN -- which most
+     * modern reverse proxies (Caddy, nginx) do by default, even for a plain
+     * Icecast mount. That leaves the Icy-Metadata header honored
+     * (icy-metaint still arrives) but the body byte-alignment broken, so no
+     * IcyInfo/StreamTitle is ever parsed. Pin this OkHttp client to HTTP/1.1
+     * to guarantee ICY parsing works regardless of what the origin/proxy
+     * would otherwise offer.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildRadioDataSourceFactory(): DataSource.Factory {
+        val okHttpClient = okhttp3.OkHttpClient.Builder()
+            .protocols(listOf(okhttp3.Protocol.HTTP_1_1))
+            .build()
+        return OkHttpDataSource.Factory(okHttpClient)
+            .setDefaultRequestProperties(mapOf("Icy-Metadata" to "1"))
     }
 
     private fun createNotificationChannel() {

@@ -49,9 +49,18 @@ class ErdStreamViewModel(
     private var monitorJob: Job? = null
     private var lastCompletedSongId: String? = null
 
+    // Tracks the last ICY "StreamTitle" already folded into nowPlayingSong, so
+    // the same title arriving on repeated onMetadata callbacks doesn't keep
+    // re-triggering a state update.
+    private var lastProcessedIcyTitle: String? = null
+
     private fun buildMediaItem(song: SongUiModel): MediaItem {
-        val bitrate = transcodeSettingsManager.bitrate.value.kbps
-        val url = repository.buildStreamUrl(song.id, bitrate)
+        val uri = if (song.sourceType == "INTERNET_RADIO" && song.audioUri != null) {
+            song.audioUri
+        } else {
+            val bitrate = transcodeSettingsManager.bitrate.value.kbps
+            repository.buildStreamUrl(song.id, bitrate)
+        }
         val metadata = MediaMetadata.Builder()
             .setTitle(song.title)
             .setArtist(song.artist)
@@ -59,7 +68,7 @@ class ErdStreamViewModel(
             .build()
         return MediaItem.Builder()
             .setMediaId(song.id)
-            .setUri(url)
+            .setUri(uri)
             .setMediaMetadata(metadata)
             .build()
     }
@@ -80,6 +89,12 @@ class ErdStreamViewModel(
         val targetSongId = queue[startIndex].id
         val dedupedQueue = queue.distinctBy { it.id }
         val dedupedStartIndex = dedupedQueue.indexOfFirst { it.id == targetSongId }.coerceAtLeast(0)
+
+        if (dedupedQueue[dedupedStartIndex].sourceType == "INTERNET_RADIO") {
+            // Fresh station tune-in: any previously tracked ICY title is stale.
+            lastProcessedIcyTitle = null
+            app.radioMetadataManager.updateIcyStreamTitle(null)
+        }
 
         val previous = _playbackState.value
         val originalQueue = if (isNewQueue) dedupedQueue else previous.originalQueue
@@ -249,6 +264,37 @@ class ErdStreamViewModel(
                         newState = newState.copy(
                             queueIndex = targetIndex,
                             nowPlayingSong = state.queue[targetIndex],
+                        )
+                    }
+                }
+
+                // Icecast/Shoutcast servers broadcast a live "StreamTitle" as
+                // ICY metadata, conventionally formatted "Artist - Title".
+                // ICY in-band metadata does not merge into
+                // Player/MediaController.mediaMetadata; PlaybackService
+                // captures it separately and publishes it via
+                // radioMetadataManager, which is read from here instead.
+                val radioSong = newState.nowPlayingSong
+                if (radioSong?.sourceType == "INTERNET_RADIO") {
+                    val liveTitle = app.radioMetadataManager.icyStreamTitle.value?.trim()
+                    if (!liveTitle.isNullOrBlank() && liveTitle != lastProcessedIcyTitle) {
+                        lastProcessedIcyTitle = liveTitle
+                        val parts = liveTitle.split(Regex("\\s+[-–]\\s+"), limit = 2)
+                        val (parsedArtist, parsedTitle) = if (parts.size == 2) {
+                            parts[0].trim() to parts[1].trim()
+                        } else {
+                            "" to liveTitle
+                        }
+                        val updatedSong = radioSong.copy(title = parsedTitle, artist = parsedArtist)
+                        val idx = newState.queueIndex
+                        val updatedQueue = if (idx != null && idx in newState.queue.indices) {
+                            newState.queue.toMutableList().also { it[idx] = updatedSong }
+                        } else {
+                            newState.queue
+                        }
+                        newState = newState.copy(
+                            nowPlayingSong = updatedSong,
+                            queue = updatedQueue,
                         )
                     }
                 }

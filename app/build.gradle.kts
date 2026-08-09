@@ -110,6 +110,12 @@ dependencies {
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-database:1.3.1")
 
+    // OkHttp-backed data source: lets internet radio streams be pinned to
+    // HTTP/1.1, which ICY in-band metadata (StreamTitle) needs to parse
+    // reliably (see PlaybackService for why). okhttp itself is already a
+    // dependency above for the Subsonic API client.
+    implementation("androidx.media3:media3-datasource-okhttp:1.3.1")
+
     // Mudita Mindful Design Framework
     implementation("com.mudita:MMD:1.0.0")
 

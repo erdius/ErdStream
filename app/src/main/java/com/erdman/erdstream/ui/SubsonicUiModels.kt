@@ -25,6 +25,13 @@ data class SongUiModel(
     val track: Int?,
     val durationSeconds: Int?,
     val suffix: String?,
+    /**
+     * "SUBSONIC" for a normal library track (its playback URL is built from
+     * `id` via SubsonicRepository) or "INTERNET_RADIO" for a user-added
+     * station, whose stream URL is `audioUri` directly.
+     */
+    val sourceType: String = "SUBSONIC",
+    val audioUri: String? = null,
 )
 
 data class PlaylistUiModel(

@@ -65,6 +65,6 @@ class TabSettingsManager(context: Context) {
         const val TAB_ROUTE_SETTINGS = "settings"
 
         /** Canonical bottom-tab routes in default display order. */
-        val DEFAULT_TAB_ROUTES = listOf("home", "artists", "playlists", "search", TAB_ROUTE_SETTINGS)
+        val DEFAULT_TAB_ROUTES = listOf("home", "artists", "playlists", "search", "radio", TAB_ROUTE_SETTINGS)
     }
 }

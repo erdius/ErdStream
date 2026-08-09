@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Radio
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -22,6 +23,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector?
     object Playlists : Screen("playlists", "Playlists", Icons.Outlined.LibraryMusic)
     object PlaylistDetails : Screen("playlistDetails", "Playlist", Icons.Outlined.LibraryMusic)
     object Search : Screen("search", "Search", Icons.Outlined.Search)
+    object Radio : Screen("radio", "Radio", Icons.Outlined.Radio)
+    object RadioStationEdit : Screen("radioStationEdit", "Radio Station", null)
     object Settings : Screen("settings", "Settings", Icons.Outlined.Settings)
 }
 
@@ -30,5 +33,6 @@ val navItems = listOf(
     Screen.Artists,
     Screen.Playlists,
     Screen.Search,
+    Screen.Radio,
     Screen.Settings,
 )

@@ -54,6 +54,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.erdman.erdstream.data.RadioStation
 import com.erdman.erdstream.data.SubsonicException
 import com.erdman.erdstream.playback.PlaybackService
 import com.erdman.erdstream.ui.AlbumDetail
@@ -68,6 +69,8 @@ import com.erdman.erdstream.ui.PlaylistDetail
 import com.erdman.erdstream.ui.PlaylistDetailsScreen
 import com.erdman.erdstream.ui.PlaylistUiModel
 import com.erdman.erdstream.ui.PlaylistsScreen
+import com.erdman.erdstream.ui.RadioScreen
+import com.erdman.erdstream.ui.RadioStationEditScreen
 import com.erdman.erdstream.ui.SearchResults
 import com.erdman.erdstream.ui.SearchScreen
 import com.erdman.erdstream.ui.ServerSetupScreen
@@ -263,6 +266,9 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
     var searchResults by remember { mutableStateOf<SearchResults?>(null) }
     var isSearching by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
+
+    val radioStations by app.radioStationsManager.stations.collectAsState()
+    var editingRadioStation by remember { mutableStateOf<RadioStation?>(null) }
 
     fun errorText(e: Throwable): String =
         (e as? SubsonicException)?.message ?: e.message ?: "Something went wrong"
@@ -704,6 +710,64 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                     },
                 )
             }
+            composable(Screen.Radio.route) {
+                RadioScreen(
+                    stations = radioStations,
+                    currentStationId = nowPlayingSong
+                        ?.takeIf { it.sourceType == "INTERNET_RADIO" }?.id,
+                    isPlaying = playbackState.isPlaying,
+                    onStationClick = { station ->
+                        // title/artist here are placeholders shown until the
+                        // station's live ICY "StreamTitle" metadata arrives
+                        // (see ErdStreamViewModel.startPlaybackMonitoring), at
+                        // which point they're replaced with the real track
+                        // info. The station name is kept in `album` so it's
+                        // never lost once that happens.
+                        val song = SongUiModel(
+                            id = station.id,
+                            title = station.name,
+                            artist = "",
+                            album = station.name,
+                            albumId = null,
+                            track = null,
+                            durationSeconds = null,
+                            suffix = null,
+                            sourceType = "INTERNET_RADIO",
+                            audioUri = station.url,
+                        )
+                        playQueue(listOf(song), 0)
+                    },
+                    onAddStationClick = {
+                        editingRadioStation = null
+                        navController.navigate(Screen.RadioStationEdit.route) { launchSingleTop = true }
+                    },
+                    onEditStationClick = { station ->
+                        editingRadioStation = station
+                        navController.navigate(Screen.RadioStationEdit.route) { launchSingleTop = true }
+                    },
+                    onDeleteStationClick = { station ->
+                        app.radioStationsManager.deleteStations(setOf(station.id))
+                    },
+                )
+            }
+            composable(Screen.RadioStationEdit.route) {
+                val editing = editingRadioStation
+                RadioStationEditScreen(
+                    initialName = editing?.name ?: "",
+                    initialUrl = editing?.url ?: "",
+                    isEditing = editing != null,
+                    onConfirm = { name, url ->
+                        val current = editing
+                        if (current != null) {
+                            app.radioStationsManager.updateStation(current.id, name, url)
+                        } else {
+                            app.radioStationsManager.addStation(name, url)
+                        }
+                        navController.popBackStack()
+                    },
+                    onCancel = { navController.popBackStack() },
+                )
+            }
             composable(Screen.Settings.route) {
                 val creds = app.credentialsManager.credentials.collectAsState().value
                 val duraspeedConfirmed = app.duraspeedSettingsManager.confirmed.collectAsState().value
@@ -789,6 +853,8 @@ private fun screenTitle(route: String?, artistName: String?): String = when (rou
     Screen.Playlists.route -> "Playlists"
     Screen.PlaylistDetails.route -> "Playlist"
     Screen.Search.route -> "Search"
+    Screen.Radio.route -> "Radio"
+    Screen.RadioStationEdit.route -> "Radio Station"
     Screen.Settings.route -> "Settings"
     else -> "ErdStream"
 }
