@@ -18,6 +18,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mudita.mmd.components.buttons.FloatingActionButtonMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.mudita.mmd.components.menus.DropdownMenuItemMMD
+import com.mudita.mmd.components.menus.DropdownMenuMMD
 
 @Composable
 fun AlbumDetailsScreen(
@@ -36,6 +42,7 @@ fun AlbumDetailsScreen(
     errorMessage: String?,
     onPlaySongClick: (SongUiModel) -> Unit,
     onShuffleClick: () -> Unit,
+    onAddToPlaylistClick: (SongUiModel) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -50,6 +57,7 @@ fun AlbumDetailsScreen(
                             isCurrentlyPlaying = song.id == currentSongId,
                             showTrackNumber = true,
                             onClick = { onPlaySongClick(song) },
+                            onAddToPlaylistClick = { onAddToPlaylistClick(song) },
                         )
                         DashedDivider()
                     }
@@ -75,43 +83,79 @@ fun SongRow(
     isCurrentlyPlaying: Boolean,
     showTrackNumber: Boolean,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
+    onAddToPlaylistClick: (() -> Unit)? = null,
+    onRemoveFromPlaylistClick: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (showTrackNumber && song.track != null) {
-            Text(
-                text = song.track.toString(),
-                fontSize = 14.sp,
-                modifier = Modifier.width(28.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-        }
+    var showMenu by remember { mutableStateOf(false) }
+    val hasMenu = onAddToPlaylistClick != null || onRemoveFromPlaylistClick != null
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                fontSize = 18.sp,
-                fontWeight = if (isCurrentlyPlaying) FontWeight.Black else FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val subtitleParts = listOfNotNull(
-                song.artist?.takeIf { it.isNotBlank() },
-                formatDurationSeconds(song.durationSeconds),
-            )
-            if (subtitleParts.isNotEmpty()) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = if (hasMenu) {
+                        { showMenu = true }
+                    } else {
+                        null
+                    },
+                )
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showTrackNumber && song.track != null) {
                 Text(
-                    text = subtitleParts.joinToString(" • "),
+                    text = song.track.toString(),
                     fontSize = 14.sp,
+                    modifier = Modifier.width(28.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song.title,
+                    fontSize = 18.sp,
+                    fontWeight = if (isCurrentlyPlaying) FontWeight.Black else FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val subtitleParts = listOfNotNull(
+                    song.artist?.takeIf { it.isNotBlank() },
+                    formatDurationSeconds(song.durationSeconds),
+                )
+                if (subtitleParts.isNotEmpty()) {
+                    Text(
+                        text = subtitleParts.joinToString(" • "),
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+
+        if (showMenu) {
+            DropdownMenuMMD(expanded = true, onDismissRequest = { showMenu = false }) {
+                onAddToPlaylistClick?.let { action ->
+                    DropdownMenuItemMMD(
+                        text = { Text(text = "Add to Playlist") },
+                        onClick = {
+                            showMenu = false
+                            action()
+                        },
+                    )
+                }
+                onRemoveFromPlaylistClick?.let { action ->
+                    DropdownMenuItemMMD(
+                        text = { Text(text = "Remove from Playlist") },
+                        onClick = {
+                            showMenu = false
+                            action()
+                        },
+                    )
+                }
             }
         }
     }

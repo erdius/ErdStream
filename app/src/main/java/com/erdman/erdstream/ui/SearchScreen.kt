@@ -39,6 +39,7 @@ fun SearchScreen(
     onArtistClick: (ArtistUiModel) -> Unit,
     onAlbumClick: (AlbumUiModel) -> Unit,
     onSongClick: (SongUiModel) -> Unit,
+    onAddToPlaylistClick: (SongUiModel) -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -139,6 +140,7 @@ fun SearchScreen(
                             isCurrentlyPlaying = song.id == currentSongId,
                             showTrackNumber = false,
                             onClick = { onSongClick(song) },
+                            onAddToPlaylistClick = { onAddToPlaylistClick(song) },
                         )
                         DashedDivider()
                     }

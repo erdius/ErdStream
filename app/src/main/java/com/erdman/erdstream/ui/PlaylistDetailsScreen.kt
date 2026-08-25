@@ -49,6 +49,7 @@ fun PlaylistDetailsScreen(
     onPlaySongClick: (SongUiModel) -> Unit,
     onShuffleClick: () -> Unit,
     onRemoveSongClick: (index: Int) -> Unit,
+    onAddToPlaylistClick: (SongUiModel) -> Unit,
 ) {
     var pendingRemoveIndex by remember { mutableStateOf<Int?>(null) }
     val removeSongSheetState = rememberModalBottomSheetMMDState(skipPartiallyExpanded = true)
@@ -67,7 +68,8 @@ fun PlaylistDetailsScreen(
                             isCurrentlyPlaying = song.id == currentSongId,
                             showTrackNumber = false,
                             onClick = { onPlaySongClick(song) },
-                            onLongClick = { pendingRemoveIndex = index },
+                            onAddToPlaylistClick = { onAddToPlaylistClick(song) },
+                            onRemoveFromPlaylistClick = { pendingRemoveIndex = index },
                         )
                         DashedDivider()
                     }

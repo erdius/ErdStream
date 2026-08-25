@@ -156,6 +156,23 @@ class SubsonicRepository(
         Unit
     }
 
+    suspend fun addSongToPlaylist(playlistId: String, songId: String) = withContext(Dispatchers.IO) {
+        api().updatePlaylist(playlistId, songId).response.requireOk()
+        Unit
+    }
+
+    /** Creates a new playlist containing just [songId], in one call. */
+    suspend fun createPlaylist(name: String, songId: String): PlaylistUiModel = withContext(Dispatchers.IO) {
+        val response = api().createPlaylist(name, listOf(songId)).response.requireOk()
+        val playlist = response.playlist ?: throw SubsonicException("Server did not return the created playlist")
+        PlaylistUiModel(
+            id = playlist.id,
+            name = playlist.name,
+            songCount = playlist.songCount ?: playlist.entry.size,
+            durationSeconds = playlist.duration ?: 0,
+        )
+    }
+
     suspend fun deletePlaylist(playlistId: String) = withContext(Dispatchers.IO) {
         api().deletePlaylist(playlistId).response.requireOk()
         Unit

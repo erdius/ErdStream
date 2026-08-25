@@ -57,6 +57,7 @@ import androidx.navigation.compose.rememberNavController
 import com.erdman.erdstream.data.RadioStation
 import com.erdman.erdstream.data.SubsonicException
 import com.erdman.erdstream.playback.PlaybackService
+import com.erdman.erdstream.ui.AddToPlaylistSheet
 import com.erdman.erdstream.ui.AlbumDetail
 import com.erdman.erdstream.ui.AlbumDetailsScreen
 import com.erdman.erdstream.ui.AlbumUiModel
@@ -238,6 +239,8 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
     var isLoadingPlaylists by remember { mutableStateOf(false) }
     var playlistsError by remember { mutableStateOf<String?>(null) }
     var hasLoadedPlaylists by remember { mutableStateOf(false) }
+
+    var songToAddToPlaylist by remember { mutableStateOf<SongUiModel?>(null) }
 
     var recentlyAddedAlbums by remember { mutableStateOf<List<AlbumUiModel>>(emptyList()) }
     var recentlyPlayedAlbums by remember { mutableStateOf<List<AlbumUiModel>>(emptyList()) }
@@ -621,6 +624,7 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                             showNowPlaying = true
                         }
                     },
+                    onAddToPlaylistClick = { song -> songToAddToPlaylist = song },
                 )
             }
             composable(Screen.Playlists.route) {
@@ -684,6 +688,7 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                             }
                         }
                     },
+                    onAddToPlaylistClick = { song -> songToAddToPlaylist = song },
                 )
             }
             composable(Screen.Search.route) {
@@ -708,6 +713,7 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                         val index = songs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
                         playQueue(songs, index)
                     },
+                    onAddToPlaylistClick = { song -> songToAddToPlaylist = song },
                 )
             }
             composable(Screen.Radio.route) {
@@ -838,6 +844,34 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
             onShuffleClick = { viewModel.toggleShuffle(mediaController) },
             onRepeatClick = { viewModel.cycleRepeatMode(mediaController) },
             onBackClick = { showNowPlaying = false },
+        )
+    }
+
+    val songForPlaylistSheet = songToAddToPlaylist
+    if (songForPlaylistSheet != null) {
+        AddToPlaylistSheet(
+            song = songForPlaylistSheet,
+            playlists = playlists,
+            onDismiss = { songToAddToPlaylist = null },
+            onAddToExisting = { playlist ->
+                scope.launch {
+                    try {
+                        app.subsonicRepository.addSongToPlaylist(playlist.id, songForPlaylistSheet.id)
+                    } catch (e: Exception) {
+                        playlistsError = errorText(e)
+                    }
+                }
+            },
+            onCreateNew = { name ->
+                scope.launch {
+                    try {
+                        val created = app.subsonicRepository.createPlaylist(name, songForPlaylistSheet.id)
+                        playlists = playlists + created
+                    } catch (e: Exception) {
+                        playlistsError = errorText(e)
+                    }
+                }
+            },
         )
     }
 }
