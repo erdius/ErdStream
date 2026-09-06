@@ -44,6 +44,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -84,6 +85,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    // androidx.annotation.OptIn (not kotlin.OptIn) is required here: UnstableApi
+    // is an AndroidX Java-interop opt-in marker, not a Kotlin @RequiresOptIn
+    // one, matching the same @OptIn(UnstableApi::class) pattern already used
+    // in PlaybackService.kt.
+    @androidx.annotation.OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
