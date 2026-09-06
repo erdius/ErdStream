@@ -78,6 +78,7 @@ class ErdStreamViewModel(
         startIndex: Int,
         controller: MediaController?,
         isNewQueue: Boolean = true,
+        resumePlayback: Boolean = true,
     ) {
         if (controller == null || queue.isEmpty() || startIndex !in queue.indices) return
 
@@ -107,7 +108,7 @@ class ErdStreamViewModel(
             else -> Player.REPEAT_MODE_OFF
         }
         controller.prepare()
-        controller.playWhenReady = true
+        controller.playWhenReady = resumePlayback
 
         _playbackState.value = previous.copy(
             queue = dedupedQueue,
@@ -115,8 +116,8 @@ class ErdStreamViewModel(
             originalQueue = originalQueue,
             isShuffleOn = shuffle,
             nowPlayingSong = dedupedQueue[dedupedStartIndex],
-            isPlaying = true,
-            isBuffering = true,
+            isPlaying = resumePlayback,
+            isBuffering = resumePlayback,
             positionMs = 0L,
             durationMs = dedupedQueue[dedupedStartIndex].durationSeconds?.times(1000L) ?: 0L,
         )
@@ -206,7 +207,7 @@ class ErdStreamViewModel(
                 originalQueue = state.queue,
                 isShuffleOn = true,
             )
-            startPlaybackFromQueue(newQueue, 0, controller, isNewQueue = false)
+            startPlaybackFromQueue(newQueue, 0, controller, isNewQueue = false, resumePlayback = state.isPlaying)
             seekTo(state.positionMs, controller)
         } else {
             if (state.originalQueue.isEmpty()) {
@@ -215,7 +216,7 @@ class ErdStreamViewModel(
             }
             val restoreIndex = state.originalQueue.indexOfFirst { it.id == current.id }.takeIf { it >= 0 } ?: 0
             _playbackState.value = state.copy(isShuffleOn = false)
-            startPlaybackFromQueue(state.originalQueue, restoreIndex, controller, isNewQueue = false)
+            startPlaybackFromQueue(state.originalQueue, restoreIndex, controller, isNewQueue = false, resumePlayback = state.isPlaying)
             seekTo(state.positionMs, controller)
         }
     }
