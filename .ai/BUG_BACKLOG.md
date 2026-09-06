@@ -49,7 +49,7 @@ Track credible bugs here. Keep `.ai/CURRENT_TASK.md` limited to the one bug curr
 - Notes: Selected as the current task (see `.ai/CURRENT_TASK.md`) — 100% reproducible with no timing/race dependency, isolated to one function, and directly affects core playback UX explicitly called out in `.ai/BUG_HUNT.md` ("queue/shuffle/repeat state").
 
 ### BUG-002 — Playlist song removal is index-based and races with itself under rapid successive removals
-- Status: NEW
+- Status: VERIFIED
 - Severity: Medium
 - Confidence: Medium
 - Area: Playlists / Subsonic API / networking

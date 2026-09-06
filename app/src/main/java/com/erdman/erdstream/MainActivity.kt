@@ -79,6 +79,7 @@ import com.erdman.erdstream.ui.SettingsScreen
 import com.erdman.erdstream.ui.SongUiModel
 import com.erdman.erdstream.ui.theme.ErdStreamTheme
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -399,6 +400,8 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
         playlistError = null
         try {
             playlistDetail = app.subsonicRepository.getPlaylistDetail(playlistId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             playlistError = errorText(e)
         } finally {
@@ -652,6 +655,24 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                 )
             }
             composable(Screen.PlaylistDetails.route) {
+                val removalQueue = remember(selectedPlaylistId) {
+                    val playlistId = selectedPlaylistId
+                    PlaylistRemovalQueue(scope) { index ->
+                        if (playlistId != null) {
+                            try {
+                                app.subsonicRepository.removeSongFromPlaylist(playlistId, index)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                playlistError = errorText(e)
+                                loadPlaylistDetail(playlistId)
+                            }
+                        }
+                    }
+                }
+                DisposableEffect(removalQueue) {
+                    onDispose { removalQueue.dispose() }
+                }
                 val songs = playlistDetail?.songs.orEmpty()
                 PlaylistDetailsScreen(
                     songs = songs,
@@ -678,14 +699,7 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                             playlistDetail = currentDetail.copy(
                                 songs = currentDetail.songs.toMutableList().apply { removeAt(index) },
                             )
-                            scope.launch {
-                                try {
-                                    app.subsonicRepository.removeSongFromPlaylist(playlistId, index)
-                                } catch (e: Exception) {
-                                    playlistError = errorText(e)
-                                    loadPlaylistDetail(playlistId)
-                                }
-                            }
+                            removalQueue.enqueue(index)
                         }
                     },
                     onAddToPlaylistClick = { song -> songToAddToPlaylist = song },
