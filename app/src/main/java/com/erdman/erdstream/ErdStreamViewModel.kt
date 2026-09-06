@@ -324,6 +324,10 @@ class ErdStreamViewModel(
         }
     }
 
+    fun stopPlaybackMonitoring() {
+        monitorJob?.cancel()
+    }
+
     override fun onCleared() {
         super.onCleared()
         monitorJob?.cancel()

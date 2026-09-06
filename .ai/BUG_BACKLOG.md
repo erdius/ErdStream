@@ -67,7 +67,7 @@ Track credible bugs here. Keep `.ai/CURRENT_TASK.md` limited to the one bug curr
 - Notes: Not selected this round — lower reproducibility confidence than BUG-001 (needs a timing race), and a clean fix (serializing removals per playlist, e.g., via a per-playlist queue/mutex, or disabling further removal taps while one is in flight) is a reasonable follow-up bug hunt task.
 
 ### BUG-003 — Playback-monitoring coroutine can keep polling a released MediaController if the replacement connection never completes
-- Status: NEW
+- Status: VERIFIED
 - Severity: Medium
 - Confidence: Medium
 - Area: Media3 lifecycle / process recreation / resource leak

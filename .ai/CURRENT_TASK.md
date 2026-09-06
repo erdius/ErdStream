@@ -6,67 +6,60 @@ Claude owns this file for the active implementation contract.
 
 ## Objective
 
-Fix BUG-002 (see `.ai/BUG_BACKLOG.md`): removing songs from a playlist sends
-`updatePlaylist.view?songIndexToRemove=<index>` requests to the server without
-serializing them against each other. Two removals fired in quick succession are
-independent, unawaited coroutines (`scope.launch { ... }` in `MainActivity.kt`'s
-`onRemoveSongClick`), so the server can receive/process them out of order or
-overlapping. Since Subsonic's `updatePlaylist.view` removes "the song currently
-at position N," a second request computed against the client's optimistic
-(pre-server-confirmation) view can end up deleting the wrong song server-side,
-with no visible error — the optimistic UI already shows what the user expects
-regardless of what actually happened server-side, until the next full reload.
+Fix BUG-003 (see `.ai/BUG_BACKLOG.md`): when the `MediaController` connection is
+released (`MainActivity.kt`'s `DisposableEffect(Unit)` `onDispose` block, e.g. on
+Activity recreation from a config change, or the Activity being torn down and
+recreated after process death), the playback-monitoring coroutine started by
+`ErdStreamViewModel.startPlaybackMonitoring()` is never told to stop. It keeps
+calling methods (`playWhenReady`, `currentPosition`, `duration`, `playbackState`,
+`currentMediaItem`) on the now-released `MediaController` instance it originally
+captured, every 200ms-1000ms, for as long as it takes a *replacement* connection
+to succeed — or forever, if the replacement connection never resolves (e.g. the
+service fails to bind). Today the stale job is only ever cancelled as a side
+effect of `startPlaybackMonitoring()` being called again by a *new* successful
+connection (its first line is `monitorJob?.cancel()`); nothing cancels it
+directly when the old controller is actually released.
 
 ## Acceptance Criteria
 
-1. When a user removes multiple songs from the same open playlist in quick
-   succession (before each prior request has completed), the
-   `updatePlaylist.view?songIndexToRemove=...` requests must reach the server
-   **in the same order the user tapped remove, and only one in flight at a
-   time** — i.e., request 2 must not be sent until request 1 has completed
-   (success or failure).
-2. This ordering guarantee must not depend on unverified assumptions about
-   library-level lock fairness. If a `Mutex` (`kotlinx.coroutines.sync.Mutex`)
-   is used for serialization, either confirm from the `kotlinx-coroutines-core`
-   version pinned in `gradle/libs.versions.toml` (or `app/build.gradle.kts`)
-   that `Mutex.lock`/`withLock` is documented as FIFO/fair, or use a
-   construction with an unambiguous ordering guarantee by construction (e.g. a
-   single dedicated coroutine draining a `Channel` of pending removals in send
-   order). Do not ship a fix whose ordering guarantee rests on an unverified
-   assumption.
-3. The existing optimistic-UI behavior must be preserved exactly: the row
-   still disappears from `playlistDetail` immediately on tap (no waiting for
-   the network call), and on failure the existing rollback
-   (`playlistError = errorText(e); loadPlaylistDetail(playlistId)`) must still
-   run for the request(s) that failed.
-4. If request 1 fails and request 2 was already enqueued behind it, request 2
-   must still run afterward (its own success/failure is independent) — a
-   failure in an earlier queued removal must not silently drop or skip a
-   later one.
-5. Switching away from the currently-open playlist (returning to
-   `PlaylistsScreen`, or opening a different playlist's details) must not leak
-   the serialization queue/state into the next playlist opened, and must not
-   throw or deadlock if songs were still queued for removal when the user
-   navigated away.
-6. No change to `addSongToPlaylist`, `deletePlaylist`, or any other
-   `SubsonicRepository`/`SubsonicApi` function not named in this contract.
+1. As soon as `MainActivity.kt`'s connection-owning `DisposableEffect(Unit)`
+   disposes (releases `controllerFuture` and sets `mediaController = null`), the
+   playback-monitoring coroutine for the controller that effect owned must stop
+   — not merely "stop once a replacement connection later succeeds."
+2. This must not depend on `LaunchedEffect(mediaController)` re-triggering:
+   verify explicitly that the fix works even if `mediaController`'s transition
+   to `null` and back to a new instance happens in a way Compose might coalesce
+   or reorder relative to other recompositions — the cancellation must be
+   invoked directly from the `onDispose` block itself, not inferred indirectly
+   from a state change.
+3. Reconnection behavior must be unchanged: when a new `MediaController`
+   connects successfully after a recreation, `startPlaybackMonitoring()` must
+   still run normally against the new controller (its existing
+   `monitorJob?.cancel()` guard against a *concurrent* stale job is harmless to
+   keep, and should remain, as defense in depth — but must no longer be the
+   *only* thing that ever cancels a stale job).
+4. Must not introduce a crash if disposal happens before any monitoring job was
+   ever started (e.g. the very first composition's `future.addListener`
+   callback never fired before the user backed out) — cancelling a `null` job
+   must be a no-op, not a `NullPointerException`.
+5. Must not change `ErdStreamViewModel.onCleared()`'s existing
+   `monitorJob?.cancel()` behavior (true ViewModel destruction, not Activity
+   recreation) — that path already works correctly and must keep working.
+6. No change to `startPlaybackMonitoring()`'s polling logic itself (position/
+   duration/buffering/queue-index/ICY-title/auto-advance handling) — only when
+   and how the job gets cancelled.
 
 ## Non-Goals
 
-- Do not fix BUG-003 (stale `MediaController` monitoring after Activity
-  recreation) in this task — already logged in `.ai/BUG_BACKLOG.md` for a
-  future pass.
-- Do not change the server-side contract, add song-ID-based removal, or touch
-  `SubsonicApi.updatePlaylist` signatures — `updatePlaylist.view` is a fixed
-  Subsonic/Navidrome server endpoint; the fix is purely about client-side
-  request ordering/serialization.
-- Do not add a general per-repository-call serialization framework or DI/testing
-  seam beyond what's needed to serialize this one call path, per
-  `.ai/ARCHITECTURE.md`'s change-discipline guidance ("prefer small diffs...
-  without a concrete need").
-- Do not change the optimistic-removal UX (e.g. don't switch to
-  "disable the row until confirmed" or "await the network call before removing
-  the row") — the row must still disappear immediately on tap.
+- Do not fix any other item in `.ai/BUG_BACKLOG.md` — none remain open as of
+  this task (BUG-001 and BUG-002 are `VERIFIED`).
+- Do not change how `MediaController` itself is connected/reconnected (the
+  `MediaController.Builder(...).buildAsync()` call, `SessionToken` construction,
+  or the `future.addListener` callback) — only add the missing "stop
+  monitoring" signal at disposal time.
+- Do not add a general lifecycle-observer abstraction or DI/testing seam for
+  `MediaController`/`ErdStreamViewModel` beyond what's needed for this one fix,
+  per `.ai/ARCHITECTURE.md`'s change-discipline guidance.
 - Do not touch the uncommitted, in-progress local changes already present in
   `app/src/main/java/com/erdman/erdstream/playback/PlaybackService.kt` (ICY
   radio-title propagation to the MediaSession for Bluetooth AVRCP) — unrelated
@@ -74,166 +67,150 @@ regardless of what actually happened server-side, until the next full reload.
 
 ## Repository Findings
 
-- `MainActivity.kt`'s `Screen.PlaylistDetails.route` composable,
-  `onRemoveSongClick = { index -> ... }` handler (~lines 671-690):
-  - Reads `playlistId` / `currentDetail` from Compose state, applies the
-    removal optimistically to local `playlistDetail`, then calls
-    `scope.launch { app.subsonicRepository.removeSongFromPlaylist(playlistId, index) }`
-    — a fire-and-forget coroutine launched on `scope` (a
-    `rememberCoroutineScope()` tied to this composable's lifecycle).
-  - Nothing here awaits a prior removal's `Job`, or otherwise prevents two
-    `scope.launch` blocks for the same playlist from running concurrently.
-- `SubsonicRepository.removeSongFromPlaylist(playlistId: String, songIndex: Int)`
-  (`data/SubsonicRepository.kt:154-157`): a plain `withContext(Dispatchers.IO)`
-  suspend call straight through to `api().updatePlaylist(playlistId, songIndex)` —
-  no serialization, locking, or per-playlist state exists here today.
-- `SubsonicApi.kt:31-36`: `updatePlaylist(playlistId, songIndexToRemove: Int)` —
-  confirms via its own doc comment that `songIndexToRemove` is "the song's
-  0-based position within the playlist, not its song ID," i.e. positional, not
-  identity-based — this is what makes ordering matter.
-- `scope` in `MainActivity.kt` is `rememberCoroutineScope()` (imported at
-  `MainActivity.kt:36`), scoped to the composition, not to any specific
-  playlist — reused across whichever playlist happens to be open.
+- `MainActivity.kt:286-305` — the connection-owning `DisposableEffect(Unit)`:
+  - `future.addListener({ mediaController = future.get() }, ...)` sets
+    `mediaController` once the async connection resolves.
+  - `onDispose { controllerFuture?.let { MediaController.releaseFuture(it) }; mediaController = null }`
+    releases the controller and clears the Compose state var, but does not
+    touch `ErdStreamViewModel`'s `monitorJob` at all.
+- `MainActivity.kt:307-309` — `LaunchedEffect(mediaController) { mediaController?.let { viewModel.startPlaybackMonitoring(it) } }`:
+  re-triggers whenever `mediaController` changes (including transitioning to
+  `null`), but its body is a no-op when the new value is `null` — so a
+  transition to `null` doesn't call anything that would cancel the running job.
+- `ErdStreamViewModel.kt:238-243` — `startPlaybackMonitoring(controller: MediaController)`:
+  `monitorJob?.cancel()` runs first, then `monitorJob = viewModelScope.launch { while (true) { ...controller.playWhenReady... } }`
+  — the `controller` parameter is captured by the launched coroutine and never
+  re-checked against a "is this still the current connection" flag.
+- `ErdStreamViewModel.kt:327-330` — `onCleared() { monitorJob?.cancel() }` — the
+  only existing direct cancellation path, and it only fires on true ViewModel
+  destruction (not Activity recreation, since `ErdStreamViewModel` is obtained
+  via a `ViewModelProvider.Factory` tied to the Activity's `ViewModelStore`,
+  which survives configuration changes).
+- `ErdStreamViewModel.kt` has no public function today that only stops
+  monitoring without starting a new job.
 
 ## Affected Components
 
-- `app/src/main/java/com/erdman/erdstream/MainActivity.kt`: the
-  `onRemoveSongClick` handler (and possibly a small amount of new
-  state/plumbing near it, e.g. a `remember { }`-held queue/channel/mutex scoped
-  to the currently open playlist).
-- Possibly `app/src/main/java/com/erdman/erdstream/data/SubsonicRepository.kt`,
-  if the serialization is implemented at the repository layer instead (see
-  State/Data Flow below for both shapes) — this is architecturally preferable
-  per `.ai/ARCHITECTURE.md` ("network API concerns stay separated from UI
-  state"), but is not mandatory if the `MainActivity.kt`-local shape more
-  cleanly satisfies the acceptance criteria with a smaller diff.
-- No changes expected to `SubsonicApi.kt`, `ErdStreamViewModel.kt`, or any
-  `ui/` composable files — `PlaylistDetailsScreen`'s `onRemoveSongClick`
-  callback signature (`(Int) -> Unit`) must not change.
+- `app/src/main/java/com/erdman/erdstream/ErdStreamViewModel.kt`: add a small
+  public function (e.g. `fun stopPlaybackMonitoring() { monitorJob?.cancel() }`)
+  callable from outside the ViewModel to cancel monitoring without starting a
+  replacement job.
+- `app/src/main/java/com/erdman/erdstream/MainActivity.kt`: call that new
+  function from the connection-owning `DisposableEffect(Unit)`'s `onDispose`
+  block, alongside the existing `controllerFuture?.let { ... }` release and
+  `mediaController = null` assignment.
+- No changes expected to `PlaybackService.kt`, `data/`, or `ui/` files.
 
 ## State / Data Flow
 
-- Today: each tap -> optimistic local removal (synchronous) -> independent
-  `scope.launch { repository call }` (asynchronous, unserialized).
-- Needed: each tap still applies the optimistic local removal synchronously
-  (unchanged), but the actual `removeSongFromPlaylist` network calls for a
-  given playlist must run strictly one-at-a-time, in tap order.
-- Two acceptable shapes (pick whichever is the smaller, cleaner diff against
-  the current code; either satisfies the acceptance criteria):
-  - **(a) Repository-layer, per-playlist serialization.** In
-    `SubsonicRepository`, hold a per-`playlistId` serial queue — e.g. a
-    `ConcurrentHashMap<String, Mutex>` (only if `Mutex` is confirmed FIFO — see
-    Acceptance Criteria #2) or a small actor built on a
-    `Channel<PlaylistRemoval>` (`data class PlaylistRemoval(val playlistId: String, val songIndex: Int, val onResult: CompletableDeferred<Result<Unit>>)`)
-    with one worker coroutine per playlist that drains it in order, calling
-    `api().updatePlaylist(...)` and completing the `Deferred` so
-    `MainActivity.kt` can still `try`/`catch` per-call for its existing
-    rollback logic. `removeSongFromPlaylist` becomes the enqueue+await call;
-    its public suspend signature can stay identical
-    (`removeSongFromPlaylist(playlistId: String, songIndex: Int)`), so
-    `MainActivity.kt`'s call site does not need to change at all.
-  - **(b) `MainActivity.kt`-local serialization.** Hold
-    `var pendingRemoval: Job? by remember { mutableStateOf<Job?>(null) }`
-    (or similar) scoped to the currently-open playlist (reset to `null`
-    whenever `selectedPlaylistId`/the loaded playlist changes, so it never
-    leaks across playlists per Acceptance Criteria #5). Each new removal's
-    `scope.launch` block first `pendingRemoval?.join()`s before calling
-    `removeSongFromPlaylist`, and immediately reassigns `pendingRemoval` to its
-    own new `Job` so the next tap chains after it, not after some earlier,
-    already-completed job.
-- Either way, per Acceptance Criteria #4, one queued removal's failure must
-  not cancel/skip a later queued removal — use `try { } catch { }` around each
-  individual network call in the chain, not a chain-wide cancellation.
+- Today: `monitorJob` is cancelled only (a) inside `startPlaybackMonitoring()`
+  itself, when a *new* connection calls it again, or (b) inside
+  `onCleared()`, on true ViewModel destruction.
+- Needed: add a third, direct path — the moment the `DisposableEffect` that
+  owns the controller connection disposes, `monitorJob` must be cancelled
+  immediately, symmetrically with how that same `onDispose` already releases
+  `controllerFuture` and nulls `mediaController`.
+- Suggested shape: `viewModel.stopPlaybackMonitoring()` called from
+  `onDispose` right next to `mediaController = null`. Since `monitorJob` is a
+  private `var` on the ViewModel, this requires exposing a minimal public
+  method rather than reaching into ViewModel internals from `MainActivity.kt`.
+  `startPlaybackMonitoring()`'s own `monitorJob?.cancel()` at its top can stay
+  as-is (harmless, defends against a hypothetical double-start), it just must
+  no longer be relied upon as the *only* stop signal.
 
 ## Interface Contracts
 
-- If shape (a): `SubsonicRepository.removeSongFromPlaylist(playlistId: String, songIndex: Int)`
-  keeps its exact current suspend signature and thrown-exception contract
-  (`SubsonicException`/network exceptions propagate to the caller exactly as
-  today) — only its internal implementation gains serialization.
-  `MainActivity.kt`'s call site is unchanged.
-- If shape (b): no `SubsonicRepository`/`SubsonicApi` signature changes at all;
-  only `MainActivity.kt`'s `onRemoveSongClick` closure gains local state/logic.
-- Either way: no change to `PlaylistDetailsScreen`'s public parameters
-  (`onRemoveSongClick: (Int) -> Unit`), and no change to `PlaylistDetail`'s
-  shape.
+- New: `ErdStreamViewModel.stopPlaybackMonitoring(): Unit` — cancels the
+  current `monitorJob` if one exists; safe to call when no job is running
+  (`monitorJob` is `null`) or after it has already completed/been cancelled.
+- No changes to `startPlaybackMonitoring(controller: MediaController)`'s
+  existing signature or behavior when called with a live controller.
+- No changes to `PlaybackState`'s shape or any other public
+  `ErdStreamViewModel` function.
 
 ## Failure Modes
 
-- Must not deadlock: if a worker coroutine (shape a) or job chain (shape b)
-  throws inside the serialized call, later queued removals must still run —
-  verify with a 3-removal-in-a-row scenario where the *first* one is made to
-  fail.
-- Must not leak coroutines/state across playlist navigation (Acceptance
-  Criteria #5) — verify by opening playlist A, queuing removals, immediately
-  navigating to playlist B, and confirming no crash, no stale removals applied
-  to B, and no unbounded growth of per-playlist worker state if the user opens
-  many playlists over a session (shape (a)'s `ConcurrentHashMap` would need
-  entries cleaned up eventually, or bounded/acceptable given typical playlist
-  counts — call out whichever tradeoff is chosen in `.ai/VERIFICATION.md`).
-- Must not change perceived UI latency for the *first* removal in a burst —
-  only subsequent overlapping removals should queue; the common case (one
-  removal, then waiting) must feel identical to today.
+- Must not throw if called before any monitoring job ever started (Acceptance
+  Criteria #4) — `monitorJob?.cancel()` on a `null` `monitorJob` is already
+  safe in Kotlin (null-safe call), so this should be naturally satisfied; just
+  don't introduce a non-null assertion (`!!`) anywhere in the process.
+- Must not create a race where `stopPlaybackMonitoring()` (from the disposing
+  effect) and a *new* `startPlaybackMonitoring()` (from a fast-reconnecting
+  replacement effect) interleave in a way that leaves monitoring permanently
+  stopped when it shouldn't be — since both run on the main thread (Compose
+  effects execute on the main dispatcher, and `viewModelScope` defaults to
+  `Dispatchers.Main.immediate`), verify there's no dispatcher-ordering
+  assumption being violated. Reasoning through the sequence: `onDispose` (old
+  effect) always runs to completion before the new `DisposableEffect(Unit)`'s
+  body runs for the recomposed subtree, and `LaunchedEffect(mediaController)`
+  only fires `startPlaybackMonitoring()` after the new controller resolves
+  (asynchronously, later) — so `stopPlaybackMonitoring()` always happens
+  first, and a later `startPlaybackMonitoring()` unconditionally starts a
+  fresh job regardless of what `stopPlaybackMonitoring()` already did. No
+  invalid interleaving is possible here, but confirm this reasoning holds
+  against the actual diff rather than assuming it.
+- Must not regress the case where the controller is still alive and well
+  (no recreation happening) — monitoring should continue completely normally
+  through the app's ordinary lifetime.
 
 ## Security / Privacy
 
-N/A — this task touches only request ordering for an already-authenticated,
-already-authorized playlist-management endpoint; no new data is transmitted,
-logged, or stored.
+N/A — this task only touches in-process coroutine lifecycle management; no
+credentials, network requests, or persisted data are involved.
 
 ## Compatibility / Migration
 
-N/A — no persisted schema, public API, or navigation changes. No server-side
-behavior change (same endpoint, same parameters, just strictly serialized from
-the client).
+N/A — no persisted schema, public API (beyond the one new internal-facing
+ViewModel method), or navigation changes.
 
 ## Test Matrix
 
-- The project has **no unit tests** and no mocking library configured
-  (confirmed during BUG-001's task: JUnit4 only, no MockK/Mockito/Robolectric).
-  `SubsonicApi`/`Retrofit` calls are not currently fake-able without a real or
-  fake HTTP layer.
-- If shape (a) is chosen and the serialization logic (e.g. the
-  queue-draining order, or a small pure function extracted from it) can be
-  exercised with a fake `suspend` call standing in for `api().updatePlaylist`
-  (e.g. a lambda with an artificial `delay()` to prove ordering under
-  concurrency, using `kotlinx-coroutines-test`'s `runTest`/virtual time if
-  available, or a plain `delay()` + `withContext` under real dispatchers if
-  not), prefer adding that test — it does not require faking the network
-  layer, only the suspend call shape.
-- If a real automated test isn't practical without more test infrastructure
-  than this task's Non-Goals allow, say so clearly in `.ai/VERIFICATION.md`
-  rather than skipping verification — device/manual verification below is
-  then the primary evidence.
+- The project has no unit tests exercising `ErdStreamViewModel`'s coroutine
+  lifecycle end-to-end (confirmed across BUG-001/BUG-002: no mocking library,
+  `MediaController` is a final Android framework class). A true reproduction
+  of "Activity recreation while `AndroidViewModel` survives" is fundamentally
+  an instrumentation-level/Robolectric concern, not a plain JVM JUnit concern.
+- If a narrow, real JVM-testable slice exists — e.g. extracting just the
+  "cancel is idempotent / safe when never started" behavior, or a fake
+  interface standing in for the polled controller methods if that can be done
+  without a broad refactor — prefer adding it. Otherwise, clearly say so in
+  `.ai/VERIFICATION.md` and rely on the runtime/device verification below,
+  same as BUG-001.
+- Do not add a general `MediaController`-faking seam purely to make this one
+  bug testable (Non-Goals).
 
 ## Runtime / Device Verification
 
-Manual repro/verification steps (run before and after the fix; a slow/high
-latency connection or an artificial delay makes the race far more likely to
-show up, so prefer testing against a deliberately throttled connection, e.g.
-OS-level network link conditioning, or a temporary `delay()` inserted for the
-test only and removed before verifying the final diff):
-1. Open a playlist with at least 4-5 distinct songs.
-2. Rapidly tap "Remove from Playlist" (long-press -> Remove -> confirm) on two
-   or three different songs in quick succession, ideally under artificial
-   network latency.
-3. **Before the fix**: reload the playlist detail screen (navigate away and
-   back, or pull-to-refresh if available) and compare the resulting
-   server-side playlist against what the optimistic UI showed right after the
-   taps — under enough latency/timing pressure, a different song than
-   expected may be missing, or the wrong final order may result.
-4. **After the fix**: repeat the same rapid-tap sequence; confirm the reloaded
-   playlist always matches exactly what the optimistic UI showed (the correct
-   songs removed, none extra, none missing).
-5. Confirm the failure-doesn't-block-later-removals case: with airplane mode
-   or a deliberately broken network briefly toggled during the first removal
-   of a burst, confirm the second/third queued removals still complete once
-   they're reached in the queue.
+Manual repro/verification steps (run before and after the fix; requires a
+device/emulator — note that neither Codex's nor Claude's execution environment
+in the BUG-001/BUG-002 passes had ADB device access, so this may need to be
+run by the user directly if that remains the case):
+1. Start playing a song.
+2. Trigger an Activity recreation while it's playing — easiest via Developer
+   Options -> "Don't keep activities" enabled, then send the app to background
+   and bring it back to the foreground (this destroys and recreates the
+   Activity), or via a manual configuration change if one applies to this
+   app's supported orientations/configs.
+3. **Before the fix**: instrument or log inside `startPlaybackMonitoring`'s
+   loop (or attach a debugger) to confirm whether the *old* monitoring
+   coroutine keeps invoking methods on the released `MediaController` during
+   the window between disposal and the new connection resolving — this should
+   be observable as either continued invocations on a released controller, or
+   (if Media3 throws on use of a released controller) exceptions in logcat
+   from that stale job.
+4. **After the fix**: confirm no invocations occur on the released controller
+   after disposal — monitoring should cleanly stop within one recomposition,
+   and cleanly restart against the new controller once it connects, with no
+   gap where two jobs are running simultaneously and no crash/log spam during
+   the transition.
+5. Confirm the non-regression case: normal playback with no recreation
+   happening continues to update the Now Playing UI (position, buffering
+   state, track advancement) exactly as before.
 6. Run `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug testDebugUnitTest` per `.ai/PROJECT.md`'s
    standard verification list. (Note: `lintDebug` currently fails on one
-   pre-existing, unrelated error at `MainActivity.kt:90` — see BUG-001's
-   `.ai/VERIFICATION.md` entry; this is not a new regression to fix as part of
-   this task, but do not introduce *additional* lint errors.)
+   pre-existing, unrelated error at `MainActivity.kt` — see BUG-001's
+   `.ai/VERIFICATION.md` entry; do not introduce *additional* lint errors, but
+   this pre-existing one is not part of this task's scope.)
 
 ## Codex Handoff
 When ready, replace `IDLE` with `READY FOR CODEX`. Codex must perform an

@@ -1,151 +1,175 @@
-# Verification — BUG-002
+# Verification — BUG-003
 
-Status: `READY FOR CLAUDE ADVERSARIAL REVIEW` (Android verification blocked)
+Status: `VERIFICATION PASSED: READY TO COMMIT`
 
-## Feasibility and reproduction
+Codex owns execution evidence here; Claude reviews it against the repo and task contract.
 
-Read AGENTS.md, BUG_HUNT.md, PROJECT.md, ARCHITECTURE.md, CURRENT_TASK.md and relevant source/build configuration. Independently confirmed before editing: each tap launched an independent coroutine in MainActivity; removeSongFromPlaylist switches to IO and directly calls the positional updatePlaylist endpoint. There is no intervening serialization. The diagnosis is feasible with existing coroutine dependencies and no API changes.
+## Feasibility Review
 
-Deterministic executable reproduction models the original independent-launch behavior: starting with A,B,C,D, taps at indices 0 then 1 should leave B,D; allowing request 2 to finish first leaves C,D. This passed as an assertion of the original defect. It is a concurrency model, not a live-server reproduction; it was executed after implementation.
+Read `AGENTS.md`, `BUG_HUNT.md`, `PROJECT.md`, `ARCHITECTURE.md`, and
+`CURRENT_TASK.md`; independently inspected the Activity connection effect,
+ViewModel job ownership, and Gradle dependencies/test layout before editing.
+The contract is feasible with existing APIs — no dependency or architecture
+changes needed.
 
-## Root cause and implementation
+Source proof before editing: the connection-owning `onDispose` released the
+future and cleared `mediaController` without cancelling `monitorJob`. The
+monitor captures its controller in `viewModelScope`, and its only
+cancellation sites were the start of replacement monitoring and `onCleared`.
+Disposal with a surviving ViewModel (a configuration change, where
+`AndroidViewModel` is retained) therefore leaves the loop alive until
+replacement or destruction. No released-controller exception was claimed;
+device reproduction was unavailable in Codex's environment.
 
-Independent positional requests could overlap and complete out of tap order. PlaylistRemovalQueue receives indices synchronously through an unlimited Channel and has exactly one consumer. The consumer awaits the entire removal/rollback callback before receiving the next index. FIFO follows synchronous enqueue order and a single consumer; no lock-fairness assumption is used.
+Clarification recorded by Codex: process death destroys the coroutine too;
+the stale-job case is specifically in-process disposal with a *surviving*
+ViewModel — most reliably a configuration change or `ActivityScenario.recreate`,
+not "Don't keep activities" (which does not reliably exercise retained
+ViewModel ownership the same way).
 
-MainActivity remembers a queue for the selected playlist within the details destination and disposes it when the destination leaves composition or the playlist key changes. Disposal cancels both queued work and the consumer. The existing synchronous optimistic update remains unchanged. Each request still catches failures and runs playlistError = errorText(e), then loadPlaylistDetail(playlistId). Cancellation is rethrown in the request handler and detail loader so navigation cancellation is not treated as a network failure.
+## Files Changed
 
-## Changed files
+- `app/src/main/java/com/erdman/erdstream/ErdStreamViewModel.kt`: added
+  `fun stopPlaybackMonitoring() { monitorJob?.cancel() }`.
+- `app/src/main/java/com/erdman/erdstream/MainActivity.kt`: the
+  connection-owning `DisposableEffect(Unit)`'s `onDispose` now calls
+  `viewModel.stopPlaybackMonitoring()` **before** `MediaController.releaseFuture(...)`
+  and `mediaController = null` — monitoring stops before the controller
+  becomes invalid, not after.
+- Pre-existing dirty `.ai/BUG_BACKLOG.md`, `.ai/CURRENT_TASK.md`, and
+  `PlaybackService.kt` (unrelated ICY/AVRCP WIP) were inspected but left
+  untouched.
 
-- app/src/main/java/com/erdman/erdstream/MainActivity.kt — queue integration and cancellation propagation during rollback.
-- app/src/main/java/com/erdman/erdstream/PlaylistRemovalQueue.kt — small dedicated FIFO worker with disposal.
-- app/src/test/java/com/erdman/erdstream/PlaylistRemovalQueueTest.kt — four deterministic JUnit regression tests, no sleeps or added dependencies.
-- .ai/VERIFICATION.md — this evidence.
+## Deviations From Contract
+`NONE` — matches the contract's suggested shape exactly (a minimal public
+`stopPlaybackMonitoring()`, called from `onDispose`).
 
-Pre-existing changes in PlaybackService.kt, BUG_BACKLOG.md and CURRENT_TASK.md were left untouched. No repository/API signatures or unrelated operations changed.
+## Commands Executed
 
-## Commands and results
+Codex (blocked by its own exec sandbox):
+1. `JAVA_HOME=.../openjdk@17/... ./gradlew assembleDebug testDebugUnitTest lintDebug` —
+   exit 1 before tasks: `FileNotFoundException` opening the Gradle wrapper
+   `zip.lck`, "Operation not permitted".
+2. Same with `GRADLE_USER_HOME` redirected to a scratch dir, invoking the
+   cached Gradle binary directly with `--offline --no-daemon` — exit 1 before
+   tasks: `FileLockContentionHandler` socket creation failed,
+   `java.net.SocketException: Operation not permitted`.
+3. `adb devices -l` — exit 1: daemon could not install the smartsocket
+   listener, "Operation not permitted"; no emulator binary present either.
+4. `git diff --check` — exit 0, no whitespace errors.
+5. `git diff --stat` / `git diff -- .../PlaybackService.kt` — confirmed scope,
+   confirmed the unrelated WIP was untouched.
+6. Inline `python3` source assertions against `git show HEAD:<path>` —
+   confirmed the baseline lacked a stop call, the new `stopPlaybackMonitoring`
+   is null-safe/idempotent, the call precedes `releaseFuture`, and polling/
+   `onCleared` text is otherwise byte-identical to `HEAD`. Static source
+   checks only, not a runtime/coroutine test.
 
-1. `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home GRADLE_USER_HOME=/private/tmp/erdstream-bug001-gradle ./gradlew assembleDebug testDebugUnitTest lintDebug --offline` — exit 1 before build: wrapper download failed with UnknownHostException: services.gradle.org. Log: /private/tmp/erdstream-bug002-checks.log.
-2. `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home GRADLE_USER_HOME=/private/tmp/erdstream-bug001-gradle /Users/david/.gradle/wrapper/dists/gradle-9.0-milestone-1-bin/3vdepk4s12bybhohyuvjcm1bd/gradle-9.0-milestone-1/bin/gradle assembleDebug testDebugUnitTest lintDebug --offline --no-daemon` — exit 1 before build: FileLockContentionHandler could not open a socket (Operation not permitted). Log: /private/tmp/erdstream-bug002-cached-gradle.log.
-3. `/opt/homebrew/share/android-commandlinetools/platform-tools/adb devices` — exit 1: daemon could not install smartsocket listener (Operation not permitted). No device/instrumentation checks could run.
-4. `python3 /private/tmp/erdstream-bug002-tests.py` — compiled the actual queue and test source with cached Kotlin 1.9.10, coroutines 1.7.3 and JUnit 4.13.2, then executed JUnitCore: OK (4 tests). Exact expanded commands/output below. This is independent JVM verification, not Gradle dependency-resolution or Android integration verification.
-5. `git diff --check` — exit 0. Inspected MainActivity diff and new queue/tests for unrelated changes.
-
-### Claude's re-run (unsandboxed host shell, not Codex's exec sandbox)
-
-Codex's own Gradle/ADB invocations were blocked by its exec sandbox (file-lock
-socket and ADB smartsocket permission errors above). Claude re-ran the same
-tasks directly from `/Users/david/Projects/ErdStream` (unsandboxed):
-
+Claude (re-run directly from the host shell, unsandboxed — same pattern as
+BUG-001/BUG-002, since Codex's own exec sandbox blocks Gradle/ADB sockets in
+this environment):
 - `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug testDebugUnitTest` →
-  **BUILD SUCCESSFUL**. This time `testDebugUnitTest` actually compiled and ran
-  (not `NO-SOURCE`, since `PlaylistRemovalQueueTest.kt` now exists) —
-  `app/build/test-results/testDebugUnitTest/TEST-com.erdman.erdstream.PlaylistRemovalQueueTest.xml`
-  shows `tests="4" failures="0" errors="0"`, matching Codex's manual-classpath
-  run but this time through the project's real Gradle/AGP/Kotlin toolchain,
-  not a hand-assembled classpath.
-- `JAVA_HOME=... ./gradlew lintDebug` → still fails, but on the exact same
-  single pre-existing error as BUG-001 (`MainActivity.kt:91` —
-  `UnsafeOptInUsageError` on `application as ErdStreamApplication`; line number
-  shifted from 90 to 91 only because of the new `CancellationException`
-  import). No new lint error was introduced by this diff.
+  **BUILD SUCCESSFUL**. `testDebugUnitTest` ran the existing 4
+  `PlaylistRemovalQueueTest` cases (no new tests for this bug, per the
+  contract's allowance given no practical JVM-testable slice for this
+  coroutine-lifecycle change).
+- `JAVA_HOME=... ./gradlew lintDebug` → still fails on exactly the same
+  single pre-existing, unrelated error as BUG-001/BUG-002
+  (`MainActivity.kt:91`, `UnsafeOptInUsageError` on
+  `application as ErdStreamApplication`). No new lint error introduced.
+- `adb devices -l` (started the ADB daemon successfully from the host shell)
+  → zero attached devices/emulators. Device/instrumentation verification of
+  the actual recreation scenario remains not possible in this environment.
 
-## Regression coverage
+## Build / Test / Lint Results
 
-- Deterministic original race demonstrates wrong surviving songs.
-- Three queued removals: first suspended behind a gate; only first entered until released, then exact tap order and expected final songs.
-- First callback handles a simulated failure; second and third still execute.
-- Disposing a blocked old queue drops pending work; a fresh queue executes independently.
+`assembleDebug` + `testDebugUnitTest`: **BUILD SUCCESSFUL**, 4/4 pre-existing
+tests pass (none targeted this change directly — see Remaining Risks).
+`lintDebug`: fails only on the pre-existing, unrelated `MainActivity.kt:91`
+error already documented for BUG-001/BUG-002 — not a regression.
 
-## Runtime results and remaining risks
+## Emulator / Device Results
 
-Full Android compilation, Gradle unit task, lint, Compose/instrumentation and API 28/device checks remain unverified due to environment restrictions above. No claim is made about the previously reported lint error being the only current error. No playback code was changed; playback runtime matrix was not exercised.
+Not possible in either Codex's or Claude's execution environment — no
+attached device/emulator (`adb devices -l` returns empty in both). The
+contract's recreation-based repro/verification (Developer Options
+"Don't keep activities" is explicitly noted by Codex as *not* reliably
+exercising this bug — a real configuration change or
+`ActivityScenario.recreate` is needed) remains outstanding and would need to
+be run on a physical device/emulator by the user.
 
-Real-server latency, failure/reconnect, and rapid playlist navigation still need manual validation. Cancellation cannot undo a removal already accepted by the server. Pending removals are discarded on destination disposal; no worker map accumulates across playlists. Tests exercise the queue lifecycle, not actual Compose navigation or HTTP cancellation.
+## Playback / Lifecycle Results
 
-The contract explicitly preserves already-enqueued positional indices after an earlier failure. Those indices can become stale if that removal failed to alter the server playlist; serialization alone does not solve this existing failure-reconciliation limitation. The current rollback behavior can also reload before later queued requests finish. Neither is claimed fixed here.
+Source-level reasoning (Codex, cross-checked by Claude): Compose effect
+disposal and the main-thread monitoring loop cannot interleave mid-iteration
+— the loop only suspends at its `delay(...)` call, and `Job.cancel()` is
+safe to call from any thread. Disposal order is: `stopPlaybackMonitoring()`
+runs first (cancelling the old job), *then* `releaseFuture`/`mediaController = null`
+— so there is no window where the old job could still be polling a
+half-released controller after disposal starts. A later, successful
+reconnection still calls `startPlaybackMonitoring()` unconditionally, which
+starts a fresh job regardless of what `stopPlaybackMonitoring()` already did
+— no interleaving between "stop old" and "start new" can leave monitoring
+permanently off. `onCleared()`'s existing `monitorJob?.cancel()` is untouched
+and still correct for true ViewModel destruction.
 
-## Contract deviations
+## Remaining Risks
 
-No dependency, API or optimistic-UX changes. Used the expressly permitted single-consumer Channel construction in a small dedicated helper instead of an inline Job chain. Navigation cancellation is propagated rather than displayed as an error. Mandatory Android checks were attempted but blocked; standalone executable tests provide bounded evidence only.
+No automated regression test exists for this exact scenario (retained
+ViewModel + Activity recreation); this requires Android
+instrumentation/Robolectric, which the project does not have configured, and
+adding that scaffolding was correctly treated as out of scope (Non-Goals).
+Device verification of the actual recreation scenario, notification/audio
+focus continuity, and API 28 behavior remain unverified in this environment,
+same limitation as BUG-001 and BUG-002.
 
 ## Claude Adversarial Review
 
-Read `PlaylistRemovalQueue.kt` and `PlaylistRemovalQueueTest.kt` in full, and
-the actual `git diff` for `MainActivity.kt` (not just Codex's summary).
+Read the full diff directly (`ErdStreamViewModel.kt` +4 lines,
+`MainActivity.kt` +1 line) — not just Codex's summary — and re-read
+`startPlaybackMonitoring`, `onCleared`, and the connection `DisposableEffect`
+in context.
 
-Root cause fixed, not masked: ordering is now guaranteed by construction (one
-`Channel`, one consumer coroutine draining it in send order), exactly what
-Acceptance Criteria #2 required — no `Mutex`-fairness assumption was
-introduced.
+Root cause fixed, not masked: the fix adds the missing *direct* cancellation
+signal at the exact point of disposal, rather than continuing to rely on a
+future reconnection to indirectly clean up (which was the actual defect —
+"only ever cancelled as a side effect of a new connection succeeding").
 
 Three adversarial scenarios constructed:
-1. **Composable re-entry / navigation churn.** `remember(selectedPlaylistId)`
-   only rebuilds the queue when the key actually changes; re-entering the same
-   destination (leaving `PlaylistDetails` and coming back to the same
-   playlist) destroys the whole subtree first, so a fresh `remember` block and
-   a fresh `DisposableEffect` always pair up — no way to end up with two live
-   queues for one playlist, or a queue outliving its `DisposableEffect`.
-   Confirmed `onDispose { removalQueue.dispose() }` is keyed on `removalQueue`
-   itself, so a key change disposes the *old* instance specifically, not
-   whichever queue happens to be current.
-2. **In-flight network call at disposal time.** `dispose()` cancels both the
-   `Channel` and the consumer `Job`. If `remove(index)` is suspended inside
-   the repository's OkHttp call when cancelled, the request may already be
-   in-flight/received server-side even though the client stops waiting for a
-   response — a real but pre-existing risk (the old code's `scope.launch` was
-   equally cancelable via the same `rememberCoroutineScope()`), not a
-   regression introduced here. Codex's own "Remaining risks" section already
-   discloses this rather than hiding it.
-3. **Failure ordering under a queued burst.** The
-   `handledFailureDoesNotSkipLaterRemovals` test proves a failure at position 0
-   doesn't stop 1 and 2 from running — matches Acceptance Criteria #4. Checked
-   the `catch (e: CancellationException) { throw e }` guard added ahead of the
-   generic `catch (e: Exception)` in both the `remove` lambda and
-   `loadPlaylistDetail`: without it, a `dispose()`-triggered cancellation
-   mid-flight would otherwise be swallowed by the generic catch and
-   misreported as `playlistError`, corrupting the UI with a spurious error
-   message on ordinary navigation. This is exactly the kind of subtle
-   lifecycle bug this contract's Failure Modes section asked to guard against,
-   and it's handled correctly.
+1. **Disposal with no monitoring ever started.** If the async
+   `MediaController.Builder(...).buildAsync()` never resolves before the user
+   backs out (e.g. immediately navigating away), `monitorJob` is still `null`
+   when `onDispose` runs. `monitorJob?.cancel()` on a `null` receiver is a
+   Kotlin no-op — confirmed by reading the exact line added; no `!!` or
+   unsafe call was introduced. Matches Acceptance Criteria #4.
+2. **Rapid recreation loop (dispose → reconnect → dispose again, fast).**
+   Each `onDispose` cancels whatever `monitorJob` currently exists at that
+   moment; each subsequent successful `LaunchedEffect(mediaController)` call
+   unconditionally starts a fresh job. Since `startPlaybackMonitoring()`'s own
+   `monitorJob?.cancel()` (pre-existing) still runs first thing, even if two
+   consecutive starts somehow raced, the second start would still cancel
+   whatever the first had set — no orphaned job can survive two starts in a
+   row. No scenario found where a live controller ends up with zero monitoring
+   or two simultaneous monitors.
+3. **`onCleared()` racing `stopPlaybackMonitoring()`.** If the Activity is
+   truly finishing (not recreating) at the same moment the connection effect
+   disposes, both `onDispose`'s `stopPlaybackMonitoring()` and the ViewModel's
+   own `onCleared()` call `monitorJob?.cancel()`. Cancelling an
+   already-cancelled or already-completed `Job` a second time is a documented
+   no-op in kotlinx.coroutines (idempotent), so this ordering is harmless
+   regardless of which fires first.
 
-Simpler/safer alternative considered: contract shape (b) (an inline
-`Job`-chain in `MainActivity.kt`) was also on the table; the dedicated
-`PlaylistRemovalQueue` class is if anything *more* readable given
-`MainActivity.kt`'s existing size, and is independently unit-tested, which an
-inline chain would not have been. No simpler implementation identified.
+No simpler implementation identified — a 4-line ViewModel addition plus a
+1-line call site is already the minimal fix; there is no smaller change that
+satisfies "cancel directly at disposal" without adding the new method.
 
-Missing test: none of the four tests exercise the real Compose
-`remember`/`DisposableEffect` wiring or actual HTTP cancellation — this is a
-known, disclosed gap (queue *logic* is unit-tested; queue *integration* is
-not), consistent with this contract's Test Matrix allowing device verification
-to stand in where Compose/network fakes aren't practical. No on-device
-verification was possible in either Codex's or Claude's environment (no
-attached device/emulator — same limitation as BUG-001).
-
-Re-ran the build independently (see Commands and results, Claude's re-run):
-`assembleDebug` + `testDebugUnitTest` **BUILD SUCCESSFUL**, all 4 new tests
-pass through the project's real Gradle toolchain (not just Codex's manual
-classpath). `lintDebug` fails only on the same pre-existing, unrelated
-`MainActivity.kt` error already documented in BUG-001's verification — no new
-lint error introduced.
-
-No remaining Critical/High defect found.
+Missing test: none, beyond what's already disclosed above — a true
+regression test needs Android instrumentation infrastructure this project
+doesn't have, and adding it was correctly out of scope per this task's
+Non-Goals. Re-ran the build independently: `assembleDebug` +
+`testDebugUnitTest` **BUILD SUCCESSFUL**; `lintDebug` shows only the one
+pre-existing, unrelated error already tracked since BUG-001. No remaining
+Critical/High defect found.
 
 ## Final Status
 VERIFICATION PASSED: READY TO COMMIT
-
-## Exact standalone test execution
-
-```text
-COMMAND: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/bin/java -cp /Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/1.9.10/57ca1b0823ae3ecb451a97e1f8e6de0b19ea5294/kotlin-compiler-embeddable-1.9.10.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/1.9.10/72812e8a368917ab5c0a5081b56915ffdfec93b7/kotlin-stdlib-1.9.10.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/1.6.10/1cbe9c92c12a94eea200d23c2bbaedaf3daf5132/kotlin-reflect-1.6.10.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.intellij.deps/trove4j/1.0.20200330/3afb14d5f9ceb459d724e907a21145e8ff394f02/trove4j-1.0.20200330.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -jvm-target 1.8 -classpath /Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/1.9.10/72812e8a368917ab5c0a5081b56915ffdfec93b7/kotlin-stdlib-1.9.10.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.7.3/2b09627576f0989a436a00a4a54b55fa5026fb86/kotlinx-coroutines-core-jvm-1.7.3.jar:/Users/david/.gradle/caches/modules-2/files-2.1/junit/junit/4.13.2/8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12/junit-4.13.2.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.hamcrest/hamcrest-core/1.3/42a25dc3219429f0e5d060061f71acb49bf010a0/hamcrest-core-1.3.jar -d /private/tmp/erdstream-bug002-test-classes app/src/main/java/com/erdman/erdstream/PlaylistRemovalQueue.kt app/src/test/java/com/erdman/erdstream/PlaylistRemovalQueueTest.kt
-COMMAND: /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/bin/java -cp /private/tmp/erdstream-bug002-test-classes:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/1.9.10/72812e8a368917ab5c0a5081b56915ffdfec93b7/kotlin-stdlib-1.9.10.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.7.3/2b09627576f0989a436a00a4a54b55fa5026fb86/kotlinx-coroutines-core-jvm-1.7.3.jar:/Users/david/.gradle/caches/modules-2/files-2.1/junit/junit/4.13.2/8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12/junit-4.13.2.jar:/Users/david/.gradle/caches/modules-2/files-2.1/org.hamcrest/hamcrest-core/1.3/42a25dc3219429f0e5d060061f71acb49bf010a0/hamcrest-core-1.3.jar org.junit.runner.JUnitCore com.erdman.erdstream.PlaylistRemovalQueueTest
-JUnit version 4.13.2
-....
-Time: 0.028
-
-OK (4 tests)
-
-```
-
-READY FOR CLAUDE ADVERSARIAL REVIEW

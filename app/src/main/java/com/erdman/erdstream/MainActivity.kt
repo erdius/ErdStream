@@ -299,6 +299,7 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
         }
 
         onDispose {
+            viewModel.stopPlaybackMonitoring()
             controllerFuture?.let { MediaController.releaseFuture(it) }
             mediaController = null
         }
