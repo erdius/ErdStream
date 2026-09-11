@@ -32,6 +32,12 @@ import com.erdman.erdstream.MainActivity
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
 
+    // Tracks the last ICY title already applied to the current MediaItem, so
+    // repeated onMetadata callbacks for the same still-playing track (Icecast
+    // servers re-send StreamTitle at a fixed byte interval, not just on
+    // change) don't call replaceMediaItem needlessly.
+    private var lastAppliedRadioTitle: String? = null
+
     companion object {
         private const val NOTIFICATION_ID = 2001
         private const val CHANNEL_ID = "erdstream_playback_channel"
@@ -118,19 +124,25 @@ class PlaybackService : MediaSessionService() {
                 // A fresh MediaItem means any previous station's live
                 // metadata is stale until new ICY data arrives.
                 app.radioMetadataManager.updateIcyStreamTitle(null)
+                lastAppliedRadioTitle = null
             }
 
             // Icecast/Shoutcast in-band "StreamTitle" metadata arrives as an
             // IcyInfo entry here. It does NOT get merged into
             // Player.mediaMetadata / MediaController.mediaMetadata, so it
             // must be read from this raw callback rather than polled from
-            // the controller.
+            // the controller. radioMetadataManager only feeds ErdStream's
+            // own UI though -- external Bluetooth AVRCP receivers (e.g. a
+            // car head unit's Now Playing display) read from the
+            // MediaSession's Player.mediaMetadata instead, so that also
+            // needs the live title pushed onto the current MediaItem below.
             override fun onMetadata(metadata: androidx.media3.common.Metadata) {
                 super.onMetadata(metadata)
                 for (i in 0 until metadata.length()) {
                     val entry = metadata.get(i)
                     if (entry is androidx.media3.extractor.metadata.icy.IcyInfo) {
                         app.radioMetadataManager.updateIcyStreamTitle(entry.title)
+                        applyIcyTitleToMediaItem(player, entry.title)
                     }
                 }
             }
@@ -179,6 +191,37 @@ class PlaybackService : MediaSessionService() {
             .build()
         return OkHttpDataSource.Factory(okHttpClient)
             .setDefaultRequestProperties(mapOf("Icy-Metadata" to "1"))
+    }
+
+    /**
+     * Pushes a live ICY "StreamTitle" onto the currently-playing MediaItem's
+     * metadata, split into artist/title the same way
+     * ErdStreamViewModel.buildMediaItem's parsing does for regular Subsonic
+     * songs (conventional Icecast format is "Artist - Title"; falls back to
+     * title-only if no separator is found). Player.replaceMediaItem swaps the
+     * MediaItem in place without interrupting playback, and updates
+     * Player.mediaMetadata / the MediaSession -- which is what an external
+     * Bluetooth AVRCP receiver (e.g. a car head unit) actually reads, unlike
+     * radioMetadataManager above, which only feeds ErdStream's own UI.
+     */
+    private fun applyIcyTitleToMediaItem(player: ExoPlayer, streamTitle: String?) {
+        val title = streamTitle?.trim()
+        if (title.isNullOrBlank() || title == lastAppliedRadioTitle) return
+        val currentItem = player.currentMediaItem ?: return
+        lastAppliedRadioTitle = title
+
+        val parts = title.split(Regex("\\s+[-–]\\s+"), limit = 2)
+        val (artist, parsedTitle) = if (parts.size == 2) {
+            parts[0].trim() to parts[1].trim()
+        } else {
+            "" to title
+        }
+        val updatedMetadata = currentItem.mediaMetadata.buildUpon()
+            .setTitle(parsedTitle)
+            .setArtist(artist)
+            .build()
+        val updatedItem = currentItem.buildUpon().setMediaMetadata(updatedMetadata).build()
+        player.replaceMediaItem(player.currentMediaItemIndex, updatedItem)
     }
 
     private fun createNotificationChannel() {
