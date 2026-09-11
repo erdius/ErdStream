@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +60,8 @@ fun NowPlayingScreen(
     onRepeatClick: () -> Unit,
     onBackClick: () -> Unit,
 ) {
+    val seekPreview = remember { mutableStateOf<Float?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -101,11 +104,18 @@ fun NowPlayingScreen(
 
         Column(modifier = Modifier.fillMaxWidth()) {
             SliderMMD(
-                value = if (durationMs > 0) currentPositionMs.toFloat() / durationMs else 0f,
+                value = seekPreview.value
+                    ?: if (durationMs > 0) currentPositionMs.toFloat() / durationMs else 0f,
                 onValueChange = { value ->
                     if (durationMs > 0) {
+                        seekPreview.value = value
+                    }
+                },
+                onValueChangeFinished = {
+                    seekPreview.value?.let { value ->
                         onSeek((value * durationMs).toLong().coerceIn(0L, durationMs))
                     }
+                    seekPreview.value = null
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
