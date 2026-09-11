@@ -85,7 +85,7 @@ Track credible bugs here. Keep `.ai/CURRENT_TASK.md` limited to the one bug curr
 - Notes: Not selected this round — lower reproducibility confidence (depends on recreation timing/failure windows) and would likely need a small interface seam (e.g., cancelling monitoring directly from the disposing effect) rather than a single-function fix. Good candidate for a future bug-hunt pass.
 
 ### BUG-004 — A failed playlist-song removal desyncs the index of every removal already queued behind it
-- Status: NEW
+- Status: VERIFIED
 - Severity: High
 - Confidence: High
 - Area: Playlists / Subsonic API / networking — direct regression risk in the exact mechanism BUG-002 fixed
