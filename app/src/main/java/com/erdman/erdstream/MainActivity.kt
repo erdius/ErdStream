@@ -668,12 +668,16 @@ fun ErdStreamMainUi(app: ErdStreamApplication) {
                         if (playlistId != null) {
                             try {
                                 app.subsonicRepository.removeSongFromPlaylist(playlistId, index)
+                                true
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Exception) {
                                 playlistError = errorText(e)
                                 loadPlaylistDetail(playlistId)
+                                false
                             }
+                        } else {
+                            false
                         }
                     }
                 }

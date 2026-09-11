@@ -31,6 +31,7 @@ class PlaylistRemovalQueueTest {
                 if (entered.size == 1) gate.await()
                 songs.removeAt(index)
                 if (entered.size == 3) done.complete(Unit)
+                true
             }
             try {
                 queue.enqueue(0); queue.enqueue(1); queue.enqueue(2)
@@ -44,25 +45,21 @@ class PlaylistRemovalQueueTest {
         }
     }
 
-    @Test fun handledFailureDoesNotSkipLaterRemovals() = runBlocking {
+    @Test fun failedRemovalDropsIndicesQueuedBehindIt() = runBlocking {
         withTimeout(5000) {
             val attempted = mutableListOf<Int>()
-            val failures = mutableListOf<Int>()
-            val done = CompletableDeferred<Unit>()
+            val firstMayFail = CompletableDeferred<Unit>()
             val queue = PlaylistRemovalQueue(this) { index ->
-                try {
-                    attempted.add(index)
-                    if (index == 0) error("Request failed")
-                } catch (e: IllegalStateException) {
-                    failures.add(index) // The caller owns rollback, as in the UI.
-                }
-                if (index == 2) done.complete(Unit)
+                attempted.add(index)
+                firstMayFail.await()
+                false
             }
             try {
                 queue.enqueue(0); queue.enqueue(1); queue.enqueue(2)
-                done.await()
-                assertEquals(listOf(0, 1, 2), attempted)
-                assertEquals(listOf(0), failures)
+                yield()
+                firstMayFail.complete(Unit)
+                yield()
+                assertEquals(listOf(0), attempted)
             } finally { queue.dispose() }
         }
     }
@@ -71,12 +68,12 @@ class PlaylistRemovalQueueTest {
         withTimeout(5000) {
             val oldCalls = mutableListOf<Int>()
             val gate = CompletableDeferred<Unit>()
-            val old = PlaylistRemovalQueue(this) { oldCalls.add(it); gate.await() }
+            val old = PlaylistRemovalQueue(this) { oldCalls.add(it); gate.await(); true }
             old.enqueue(0); old.enqueue(1)
             yield()
             old.dispose()
             val done = CompletableDeferred<Int>()
-            val next = PlaylistRemovalQueue(this) { done.complete(it) }
+            val next = PlaylistRemovalQueue(this) { done.complete(it); true }
             try {
                 next.enqueue(3)
                 assertEquals(3, done.await())
